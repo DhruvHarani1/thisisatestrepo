@@ -1,0 +1,581 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>A Surprise for Trisha</title>
+
+    <!-- Tailwind CSS for styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- React Libraries -->
+    <script src="https://unpkg.com/react@17/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@17/umd/react-dom.development.js"></script>
+
+    <!-- Babel to translate JSX in the browser -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+    <!-- Custom Styles and Fonts -->
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500&family=Playfair+Display:wght@400;700&family=Kalam&display=swap');
+        :root { --ivory: #fdfdfb; --charcoal: #333333; --stone-200: #e7e5e4; --stone-500: #78716c; --stone-600: #57534e; --stone-700: #44403c; --stone-800: #292524; --gradient-start: #fdfdfb; --gradient-end: #fff0f5; }
+        body { font-family: 'Inter', sans-serif; color: var(--charcoal); scroll-behavior: smooth; }
+        .font-body { font-family: 'Inter', sans-serif; }
+        .font-serif-display { font-family: 'Playfair Display', serif; }
+        .font-handwriting { font-family: 'Kalam', cursive; }
+        .animated-gradient { background: linear-gradient(135deg, var(--gradient-start), var(--gradient-end)); background-size: 200% 200%; animation: gradient-animation 15s ease infinite; }
+        @keyframes gradient-animation { 0% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } 100% { background-position: 0% 50%; } }
+        .graphic-container:hover svg { transform: scale(1.1) rotate(-5deg) !important; }
+        .compass-svg:hover g { transform: translate(50,50) rotate(360deg); transition: transform 1s ease-out; }
+        .animate-draw { stroke-dasharray: 1000; stroke-dashoffset: 1000; animation: draw-animation 5s ease-out forwards; }
+        @keyframes draw-animation { to { stroke-dashoffset: 0; } }
+        @keyframes float { 0% { transform: translate(-50%, -50%) translateY(0px); } 50% { transform: translate(-50%, -50%) translateY(-15px); } 100% { transform: translate(-50%, -50%) translateY(0px); } }
+        .animate-float { animation: float 6s ease-in-out infinite; }
+    </style>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/babel">
+    // All of our React components go here
+    const { useState, useEffect, useRef } = React;
+
+    // --- Main App Component ---
+    function App() {
+        // --- ✍️ PERSONALIZE YOUR SURPRISE HERE! ---
+
+        // 1. Main Photo - Now featuring Trisha at the aquarium
+        const mainPhotoUrl = "https://i.ibb.co/gZHNbTNT/Whats-App-Image-2025-07-26-at-14-48-54-f588f1dd.jpg";
+
+        // 2. "Shared Moments" Gallery Photos - Updated with your images
+        const galleryPhotos = [
+            { src: "https://i.ibb.co/Dqfgcr4/Whats-App-Image-2025-07-26-at-14-46-22-6aff7486.jpg", caption: "That time we were just chilling." },
+            { src: "https://i.ibb.co/Qvn0WBDb/Whats-App-Image-2025-07-26-at-14-46-46-f11a143e.jpg", caption: "On the metro, going places." },
+            { src: "https://i.ibb.co/zVn0CXyS/Whats-App-Image-2025-07-26-at-15-20-55-c128503a.jpg", caption: "The day we first met." },
+        ];
+
+        // 3. Main Message (for handwritten effect)
+        const message = "It's not always easy to say things out loud, so I hoped this might be a better way...";
+
+        // 4. Interactive Quiz - UPDATED
+        const quiz = {
+            question: "Out of all the cool things we saw at Science City, which memory stands out the most?",
+            options: [
+                { answer: "The Space Section", message: "Yes! It felt like we were exploring a whole new universe together." },
+                { answer: "The Aquarium Tunnel", message: "Totally! I loved watching the sharks swim over us. A perfect memory." },
+                { answer: "The Robotics Gallery", message: "You're right! Seeing all that futuristic tech with you was so cool." }
+            ],
+        };
+
+        // 5. "Reasons You're Amazing" List - UPDATED WITH PERSONALIZED TEXT
+        const reasons = [
+            { title: "The Way You Speak", description: "You have this incredible way of making people feel truly seen. When you Speak, it's like the rest of the world just fades away." },
+            { title: "Your Laugh", description: "It's genuinely my favorite sound. Especially when it's that full, can't-breathe kind of laugh over something silly." },
+            { title: "Your Sharp Mind", description: "I love how your mind works. The way you connect ideas and your sharp wit always keep me on my toes in the best way." },
+        ];
+
+        // 6. "Playlist of Us" - Paste your Spotify Playlist URL or URI here!
+        const spotifyPlaylistUri = "https://open.spotify.com/playlist/37i9dQZF1EJywgmgjmb31y?si=GmobhOFNRYip8ouBrsNbPg&pi=ala3krNxRHqRH"; // Example: A default popular playlist
+
+        // 7. "Our Map" Locations - UPDATED
+        const mapLocations = [
+            { x: 25, y: 20, name: "Palanpur", memory: "My hometown." },
+            { x: 20, y: 35, name: "Deesa", memory: "Your hometown." },
+            { x: 70, y: 75, name: "Sandwichwalla", memory: "The best sandwiches in Gandhinagar." },
+            { x: 65, y: 60, name: "Game Zone", memory: "Our competitive streak in action." },
+            { x: 80, y: 45, name: "Science City", memory: "Our amazing day trip to Ahmedabad." },
+        ];
+
+        // 8. "Look to the Future" Ideas - UPDATED WITH PERSONALIZED TEXT
+        const futurePlans = [ "A late-night food crawl through Manek Chowk.", "A bonfire night in Spiti, trading stories with strangers under a thousand stars.", "Turning a power cut into a candlelit karaoke night" ];
+
+        // 9. "Words That Describe You" Cloud
+        const wordCloud = ["Brilliant", "Funny", "Adventurous", "Kind", "Creative", "Inspiring", "Genuine", "Warm"];
+
+        // 10. "This Reminded Me of You" Reel - UPDATED
+        const reminderReel = [
+            { src: "https://placehold.co/400x400/f8bbd0/333?text=Spring+Flowers", caption: "Every time flowers bloom, I think of the joy and color you bring into my life." },
+            { src: "https://placehold.co/400x400/81d4fa/333?text=The+Moonlit+Night", caption: "A calm moon night reminds me of your serenity always glowing, never loud." },
+            { src: "https://placehold.co/400x400/ffcc80/333?text=A+Beautiful+Sunset", caption: "And every time I see a beautiful sunset, it reminds me of the warmth you bring." },
+        ];
+
+        // 11. "Digital Time Capsule" - UPDATED
+        const timeCapsule = {
+            unlockDate: "2032-05-02", // FORMAT: YYYY-MM-DD (7 years from now)
+            message: "If you're reading this... then I guess I was right we made it. By this date, I believe I’ve married the love of my life you. Seven years have passed, and I hope every moment has only brought us closer, stronger, and more in love. Creating this little time capsule was my way of leaving a digital love note for our future selves. May our journey ahead be even more magical than what I had imagined back then."
+        };
+
+        // --- End of Personalization ---
+
+        return (
+            <main className="text-charcoal font-body animated-gradient">
+                <IntroSection />
+                <HandwrittenMessage message={message} />
+                <GallerySection photos={galleryPhotos} />
+                <PlaylistSection playlistUri={spotifyPlaylistUri} />
+                <MapSection locations={mapLocations} />
+                <Reveal>
+                    <div className="py-16 md:py-24 px-4 relative">
+                        <img src={mainPhotoUrl} alt="A special memory" className="w-full max-w-4xl mx-auto h-auto rounded-lg shadow-2xl object-cover" onError={(e) => { e.target.onerror = null; e.target.src='https://placehold.co/1200x800/e0e0e0/333333?text=Image+Error'; }}/>
+                        <div className="absolute bottom-20 md:bottom-28 left-1/2 -translate-x-1/2 w-full px-8">
+                            <Reveal>
+                                <p className="text-white text-xl md:text-2xl font-serif-display text-center bg-black/30 p-4 rounded-lg backdrop-blur-sm">Even the most beautiful art in the aquarium couldn't compare to you.</p>
+                            </Reveal>
+                        </div>
+                    </div>
+                </Reveal>
+                <WordCloudSection words={wordCloud} />
+                <QuizSection quiz={quiz} />
+                <ReminderReel photos={reminderReel} />
+                <SectionWithGraphic graphic={<Chocolate />} graphicSide="right">
+                    <div className="w-full">
+                        <h2 className="text-center text-3xl font-serif-display text-stone-700 mb-12">A few reasons you're amazing...</h2>
+                        <div className="space-y-8 max-w-md mx-auto">
+                            {reasons.map((reason, index) => (
+                                <div key={index} className="text-left p-6 border border-stone-200 rounded-lg bg-ivory/50 backdrop-blur-sm shadow-sm">
+                                    <h3 className="text-xl font-bold text-stone-800 mb-2">{reason.title}</h3>
+                                    <p className="text-stone-600">{reason.description}</p>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                </SectionWithGraphic>
+                <FutureSection plans={futurePlans} />
+                <DreamGetawaySection />
+                <TimeCapsuleSection capsule={timeCapsule} />
+                <AnalysisSection />
+                <OutroSection />
+            </main>
+        );
+    }
+
+
+    // --- REUSABLE & NEW COMPONENTS ---
+
+    const Reveal = ({ children, threshold = 0.2, className = "" }) => {
+        const ref = useRef(null);
+        const [isVisible, setIsVisible] = useState(false);
+
+        useEffect(() => {
+            const observer = new IntersectionObserver(
+                ([entry]) => {
+                    if (entry.isIntersecting) {
+                        setIsVisible(true);
+                        observer.unobserve(entry.target);
+                    }
+                },
+                { root: null, rootMargin: '0px', threshold: threshold }
+            );
+            if (ref.current) observer.observe(ref.current);
+            return () => { if (ref.current) observer.disconnect(); };
+        }, [ref, threshold]);
+
+        return (
+            <div ref={ref} className={`transition-all duration-1000 ease-out ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'} ${className}`}>
+                {children}
+            </div>
+        );
+    };
+
+    const SectionWithGraphic = ({ children, graphic, graphicSide = 'left' }) => {
+        const [offsetY, setOffsetY] = useState(0);
+        const sectionRef = useRef(null);
+
+        useEffect(() => {
+            const handleScroll = () => {
+                if (sectionRef.current) {
+                    const sectionTop = sectionRef.current.offsetTop;
+                    const scrollY = window.scrollY;
+                    const relativeScroll = scrollY - sectionTop;
+                    if (scrollY > sectionTop - window.innerHeight && scrollY < sectionTop + sectionRef.current.offsetHeight) {
+                        setOffsetY(relativeScroll * 0.1);
+                    }
+                }
+            };
+            window.addEventListener('scroll', handleScroll);
+            return () => window.removeEventListener('scroll', handleScroll);
+        }, []);
+
+        return (
+            <div ref={sectionRef} className="py-24 md:py-32 px-4">
+                <Reveal>
+                    <div className="relative w-full max-w-2xl mx-auto text-center">
+                        {children}
+                        <div
+                            className={`graphic-container absolute -z-10 w-32 h-32 md:w-48 md:h-48 top-1/2 ${graphicSide === 'left' ? 'left-0 -translate-x-1/2 md:-translate-x-3/4' : 'right-0 translate-x-1/2 md:translate-x-3/4'}`}
+                            style={{ transform: `translateY(calc(-50% + ${offsetY}px))` }}
+                        >
+                            {graphic}
+                        </div>
+                    </div>
+                </Reveal>
+            </div>
+        );
+    };
+
+    // --- PAGE SECTIONS (Existing and New) ---
+
+    const IntroSection = () => (
+        <div className="h-screen flex flex-col items-center justify-center text-center p-4">
+            <Reveal>
+                <h1 className="text-4xl md:text-5xl font-serif-display text-stone-700">For Trisha</h1>
+                <p className="text-stone-500 mt-4 text-lg">A few thoughts, put into words.</p>
+            </Reveal>
+            <div className="absolute bottom-8 text-stone-400 animate-bounce"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 5v14" /><path d="m19 12-7 7-7-7" /></svg></div>
+        </div>
+    );
+
+    const HandwrittenMessage = ({ message }) => {
+        const ref = useRef(null);
+        const [isVisible, setIsVisible] = useState(false);
+        useEffect(() => {
+            const observer = new IntersectionObserver(([entry]) => { if (entry.isIntersecting) setIsVisible(true); }, { threshold: 0.5 });
+            if (ref.current) observer.observe(ref.current);
+            return () => observer.disconnect();
+        }, []);
+
+        return (
+            <div ref={ref} className="py-24 md:py-32 px-4 text-center">
+                <svg viewBox="0 0 800 100" className="w-full max-w-3xl mx-auto">
+                    <path id="handwriting-path" d="M 50 50 H 750" fill="transparent" />
+                    <text className="text-3xl font-handwriting text-stone-600">
+                        <textPath href="#handwriting-path" className={isVisible ? 'animate-draw' : ''}>
+                            {message}
+                        </textPath>
+                    </text>
+                </svg>
+            </div>
+        );
+    };
+
+    const GallerySection = ({ photos }) => (
+        <div className="py-16 md:py-24">
+            <Reveal>
+                <h2 className="text-center text-3xl font-serif-display text-stone-700 mb-12">Shared Moments</h2>
+                <div className="flex overflow-x-auto space-x-8 pb-8 pl-8 snap-x snap-mandatory">
+                    {photos.map((photo, index) => (
+                        <div key={index} className="snap-center flex-shrink-0 w-3/4 md:w-1/3 transition-opacity duration-1000">
+                            <div className="w-full">
+                                <img src={photo.src} alt={photo.caption} className="w-full h-96 object-cover rounded-lg shadow-xl" onError={(e) => { e.target.onerror = null; e.target.src='https://placehold.co/600x800/e0e0e0/333333?text=Image+Error'; }} />
+                                <p className="text-center mt-4 text-stone-600">{photo.caption}</p>
+                            </div>
+                        </div>
+                    ))}
+                    <div className="flex-shrink-0 w-8"></div>
+                </div>
+            </Reveal>
+        </div>
+    );
+
+    const PlaylistSection = ({ playlistUri }) => {
+        const getPlaylistId = (uriOrUrl) => {
+            try {
+                if (uriOrUrl.includes('open.spotify.com')) {
+                    const path = new URL(uriOrUrl).pathname;
+                    return path.split('/').pop();
+                }
+                if (uriOrUrl.startsWith('spotify:playlist:')) {
+                    return uriOrUrl.split(':').pop();
+                }
+            } catch (e) { console.error("Could not parse Spotify URI/URL", e); }
+            const parts = uriOrUrl.split('/');
+            const lastPart = parts.pop() || '';
+            return lastPart.split('?')[0];
+        };
+
+        const playlistId = getPlaylistId(playlistUri);
+        const embedUrl = `https://open.spotify.com/embed/playlist/${playlistId}?utm_source=generator&theme=0`;
+
+        return (
+            <SectionWithGraphic graphic={<Headphones />} graphicSide="right">
+                <h2 className="text-center text-3xl font-serif-display text-stone-700 mb-8">A Playlist for Us</h2>
+                <div className="max-w-md mx-auto">
+                    <iframe
+                        title="Spotify Playlist"
+                        style={{ borderRadius: '12px' }}
+                        src={embedUrl}
+                        width="100%"
+                        height="352"
+                        frameBorder="0"
+                        allowFullScreen=""
+                        allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
+                        loading="lazy"
+                    ></iframe>
+                    <p className="text-center mt-4 text-stone-500">Our music taste: 99% match.</p>
+                </div>
+            </SectionWithGraphic>
+        );
+    };
+
+    const MapSection = ({ locations }) => {
+        const [activeLocation, setActiveLocation] = useState(null);
+        return (
+            <div className="py-24 md:py-32 px-4">
+                <Reveal>
+                    <h2 className="text-center text-3xl font-serif-display text-stone-700 mb-4">Our Map</h2>
+                    <p className="text-center text-stone-500 mb-8">Move your mouse over the pink dots to see a little information about each place.</p>
+                </Reveal>
+                <Reveal className="relative w-full max-w-2xl h-96 mx-auto bg-stone-100/50 rounded-lg border border-stone-200 p-4">
+                    <svg width="100%" height="100%" viewBox="0 0 100 100" preserveAspectRatio="none">
+                        <path d="M25 20 L 20 35" stroke="#d1d5db" strokeWidth="0.5" fill="none" strokeDasharray="2"/>
+                        <path d="M25 20 L 70 75" stroke="#d1d5db" strokeWidth="0.5" fill="none" strokeDasharray="2"/>
+                        <path d="M70 75 L 80 45" stroke="#d1d5db" strokeWidth="0.5" fill="none" strokeDasharray="2"/>
+                        <path d="M65 60 L 70 75" stroke="#d1d5db" strokeWidth="0.5" fill="none" strokeDasharray="2"/>
+                    </svg>
+                    {locations.map(loc => (
+                        <div key={loc.name} className="absolute group" style={{ left: `${loc.x}%`, top: `${loc.y}%` }}
+                             onMouseEnter={() => setActiveLocation(loc)} onMouseLeave={() => setActiveLocation(null)}>
+                            <div className="w-4 h-4 bg-rose-400 rounded-full cursor-pointer animate-pulse group-hover:scale-150 transition-transform"></div>
+                            <span className="absolute -bottom-6 left-1/2 -translate-x-1/2 text-xs text-stone-600 font-semibold whitespace-nowrap">{loc.name}</span>
+                        </div>
+                    ))}
+                    {activeLocation && (
+                        <div className="absolute p-3 bg-white rounded-lg shadow-lg text-left pointer-events-none" style={{ left: `${activeLocation.x}%`, top: `${activeLocation.y}%`, transform: 'translate(20px, -120%)' }}>
+                            <p className="text-sm text-stone-600">{activeLocation.memory}</p>
+                        </div>
+                    )}
+                </Reveal>
+            </div>
+        );
+    };
+
+    const WordCloudSection = ({ words }) => (
+        <div className="py-24 md:py-32 px-4">
+            <Reveal><h2 className="text-center text-3xl font-serif-display text-stone-700 mb-16">Words That Come to Mind</h2></Reveal>
+            <Reveal className="relative w-full max-w-2xl h-64 mx-auto">
+                {words.map((word, i) => {
+                    const angle = (i / words.length) * 2 * Math.PI;
+                    const x = 50 + 40 * Math.cos(angle);
+                    const y = 50 + 25 * Math.sin(angle);
+                    return (
+                        <span key={word} className="absolute text-stone-600 text-lg md:text-xl p-2 animate-float"
+                              style={{ left: `${x}%`, top: `${y}%`, transform: 'translate(-50%, -50%)', animationDelay: `${i * 0.2}s` }}>
+                                {word}
+                            </span>
+                    );
+                })}
+            </Reveal>
+        </div>
+    );
+
+    const QuizSection = ({ quiz }) => {
+        const [selectedAnswer, setSelectedAnswer] = useState(null);
+        const handleAnswer = (option) => { setSelectedAnswer(option); };
+
+        return (
+            <SectionWithGraphic graphic={<CoffeeCup />} graphicSide="left">
+                <h2 className="text-2xl md:text-3xl leading-relaxed text-stone-600 font-serif-display mb-8">{quiz.question}</h2>
+                <div className="flex flex-col items-center space-y-4">
+                    {quiz.options.map(option => (
+                        <button key={option.answer} onClick={() => handleAnswer(option)}
+                                className={`w-full max-w-sm p-4 border rounded-lg transition-all duration-300 ${selectedAnswer ? 'border-stone-300 opacity-50' : 'border-stone-300 hover:bg-stone-100'}`}>
+                            {option.answer}
+                        </button>
+                    ))}
+                </div>
+                {selectedAnswer && <Reveal><p className="mt-6 text-emerald-700 font-semibold">{selectedAnswer.message}</p></Reveal>}
+            </SectionWithGraphic>
+        );
+    };
+
+    const ReminderReel = ({ photos }) => (
+        <div className="py-16 md:py-24 bg-stone-100/50">
+            <Reveal><h2 className="text-center text-3xl font-serif-display text-stone-700 mb-12">This Reminded Me of You...</h2></Reveal>
+            <div className="flex justify-center space-x-8">
+                {photos.map((photo, index) => (
+                    <Reveal key={index} threshold={0.5}>
+                        <div className="text-center">
+                            <img src={photo.src} alt={photo.caption} className="w-48 h-48 md:w-64 md:h-64 object-cover rounded-full shadow-xl" />
+                            <p className="mt-4 text-stone-600 max-w-xs">{photo.caption}</p>
+                        </div>
+                    </Reveal>
+                ))}
+            </div>
+        </div>
+    );
+
+    const FutureSection = ({ plans }) => (
+        <SectionWithGraphic graphic={<Compass />} graphicSide="left">
+            <h2 className="text-center text-3xl font-serif-display text-stone-700 mb-12">Looking Ahead</h2>
+            <div className="space-y-4 max-w-md mx-auto">
+                {plans.map((plan, index) => (
+                    <div key={index} className="text-center p-4 bg-white/50 border border-stone-200 rounded-lg">
+                        <p className="text-lg text-stone-700">{plan}</p>
+                    </div>
+                ))}
+            </div>
+        </SectionWithGraphic>
+    );
+
+    const DreamGetawaySection = () => {
+        const [plan, setPlan] = useState(null);
+        const [loading, setLoading] = useState(false);
+
+        // Pre-written plan to avoid API errors in a standalone file
+        const prewrittenPlan = {
+            "title": "North-East Edge Adventure",
+            "day1_morning": "Arrive in Shillong and drive to Mawkdok Valley. kick things off by ziplining over a deep, green gorge.",
+            "day1_afternoon": "Head to Cherrapunji and trek to the stunning Double Decker Living Root Bridge, nature's own marvel.",
+            "day1_evening": "Settle into a cliffside homestay with misty views and a warm Khasi meal under the stars.",
+
+            "day2_morning": "Explore the glowing limestone tunnels of Mawsmai Caves. crawl, climb, and feel the thrill underground.",
+            "day2_afternoon": "Reach Dawki and kayak on the glass-clear Umngot River. it’s like floating through air.",
+            "day2_evening": "Camp riverside, light a bonfire, and cook dinner over flames as fireflies flicker nearby.",
+
+            "day3_morning": "Drive to the edge of the world at Laitlum Canyons. scream into the abyss and hear it echo back.",
+            "day3_afternoon": "Grab local Khasi food at a roadside joint, pack up, and head back to Shillong.",
+            "day3_evening": "Leave with muddy shoes, adrenaline-fueled stories, and a new definition of adventure."
+        };
+
+
+        const showPlan = () => {
+            setLoading(true);
+            // Simulate a short loading time
+            setTimeout(() => {
+                setPlan(prewrittenPlan);
+                setLoading(false);
+            }, 1000);
+        };
+
+        return (
+            <SectionWithGraphic graphic={<PaperPlane />} graphicSide="right">
+                <h2 className="text-center text-3xl font-serif-display text-stone-700 mb-4">Dream Getaway Planner</h2>
+                <p className="text-center text-stone-500 mb-8">Let's dream up our next adventure together.</p>
+                <div className="flex flex-col items-center space-y-4">
+                    <button
+                        onClick={showPlan}
+                        disabled={loading || plan}
+                        className="px-6 py-3 bg-rose-400 text-white font-bold rounded-lg shadow-md hover:bg-rose-500 transition-colors disabled:bg-stone-300"
+                    >
+                        {loading ? "Dreaming..." : (plan ? "Plan Revealed!" : "Reveal a Dream Trip ✨")}
+                    </button>
+                </div>
+
+                {plan && (
+                    <Reveal className="mt-12 text-left max-w-md mx-auto">
+                        <h3 className="text-2xl font-serif-display text-center text-stone-800 mb-6">{plan.title}</h3>
+                        <div className="space-y-6">
+                            <div>
+                                <h4 className="font-bold text-lg text-stone-700 border-b border-stone-200 pb-2 mb-2">Day 1</h4>
+                                <p><strong className="text-stone-600">Morning:</strong> {plan.day1_morning}</p>
+                                <p><strong className="text-stone-600">Afternoon:</strong> {plan.day1_afternoon}</p>
+                                <p><strong className="text-stone-600">Evening:</strong> {plan.day1_evening}</p>
+                            </div>
+                            <div>
+                                <h4 className="font-bold text-lg text-stone-700 border-b border-stone-200 pb-2 mb-2">Day 2</h4>
+                                <p><strong className="text-stone-600">Morning:</strong> {plan.day2_morning}</p>
+                                <p><strong className="text-stone-600">Afternoon:</strong> {plan.day2_afternoon}</p>
+                                <p><strong className="text-stone-600">Evening:</strong> {plan.day2_evening}</p>
+                            </div>
+                            <div>
+                                <h4 className="font-bold text-lg text-stone-700 border-b border-stone-200 pb-2 mb-2">Day 3</h4>
+                                <p><strong className="text-stone-600">Morning:</strong> {plan.day3_morning}</p>
+                                <p><strong className="text-stone-600">Afternoon:</strong> {plan.day3_afternoon}</p>
+                                <p><strong className="text-stone-600">Evening:</strong> {plan.day3_evening}</p>
+                            </div>
+                        </div>
+                    </Reveal>
+                )}
+            </SectionWithGraphic>
+        );
+    };
+
+    const TimeCapsuleSection = ({ capsule }) => {
+        const [isUnlocked, setIsUnlocked] = useState(false);
+        const unlockDate = new Date(capsule.unlockDate);
+        const now = new Date();
+
+        useEffect(() => { if (now >= unlockDate) { setIsUnlocked(true); } }, [unlockDate]);
+
+        return (
+            <div className="py-24 md:py-32 px-4 text-center">
+                <Reveal>
+                    <h2 className="text-3xl font-serif-display text-stone-700 mb-4">A Digital Time Capsule</h2>
+                    <div className="p-8 border-2 border-dashed border-stone-300 rounded-lg max-w-2xl mx-auto">
+                        {isUnlocked ? (
+                            <p className="text-lg text-stone-600">{capsule.message}</p>
+                        ) : (
+                            <div>
+                                <p className="text-lg text-stone-600">To be unlocked on:</p>
+                                <p className="text-2xl font-bold text-stone-800 mt-2">{unlockDate.toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' })}</p>
+                            </div>
+                        )}
+                    </div>
+                </Reveal>
+            </div>
+        );
+    };
+
+    const AnalysisSection = () => (
+        <SectionWithGraphic graphic={<Flower />} graphicSide="left">
+            <h2 className="text-center text-3xl font-serif-display text-stone-700 mb-12">Analysis of Our Journey</h2>
+            <p className="text-center text-stone-500 mb-8">Let's dive into the data and discover more about our time together.</p>
+            <div className="flex flex-col items-center space-y-4">
+                <button
+                    onClick={() => window.location.href = 'analysis.html'}
+                    className="px-6 py-3 bg-emerald-400 text-white font-bold rounded-lg shadow-md hover:bg-emerald-500 transition-colors"
+                >
+                    View Analysis
+                </button>
+            </div>
+        </SectionWithGraphic>
+    );
+
+    const OutroSection = () => {
+        const [isRevealed, setIsRevealed] = useState(false);
+        return (
+            <div className="h-[80vh] flex flex-col items-center justify-center text-center p-4 relative">
+                <Reveal>
+                    <p className="text-xl text-stone-500">Anyway, that's all.</p>
+                    <h2 className="mt-4 text-3xl md:text-4xl font-serif-display text-stone-700">Hope this made you smile.</h2>
+                </Reveal>
+                <div className="absolute bottom-10 right-10">
+                    <button onClick={() => setIsRevealed(!isRevealed)} className="w-6 h-6 text-stone-300 hover:text-rose-400 transition-colors" title="A little secret...">
+                        <svg viewBox="0 0 100 100"><path d="M50,0 L61.2,35.3 H98.8 L68.8,57.2 L79.9,92.7 L50,70.7 L20.1,92.7 L31.2,57.2 L1.2,35.3 H38.8 Z" fill="currentColor"/></svg>
+                    </button>
+                </div>
+                {isRevealed && <div className="absolute bottom-20 right-10 p-4 bg-white rounded-lg shadow-xl text-stone-700">P.S. You're pretty great.</div>}
+            </div>
+        );
+    };
+
+    // --- SVG GRAPHICS ---
+
+    const Flower = () => <svg viewBox="0 0 100 100" className="transition-transform duration-500 ease-out"><g transform="translate(50 50) rotate(-30)"><circle cx="0" cy="0" r="15" fill="#fde047"/><path d="M0-40 C20-40, 20-20, 0-15 C-20-20, -20-40, 0-40" fill="#fb923c"/><path d="M0-40 C20-40, 20-20, 0-15 C-20-20, -20-40, 0-40" fill="#fb923c" transform="rotate(72)"/><path d="M0-40 C20-40, 20-20, 0-15 C-20-20, -20-40, 0-40" fill="#fb923c" transform="rotate(144)"/><path d="M0-40 C20-40, 20-20, 0-15 C-20-20, -20-40, 0-40" fill="#fb923c" transform="rotate(216)"/><path d="M0-40 C20-40, 20-20, 0-15 C-20-20, -20-40, 0-40" fill="#fb923c" transform="rotate(288)"/></g></svg>;
+    const Chocolate = () => <svg viewBox="0 0 100 100" className="transition-transform duration-500 ease-out"><g transform="rotate(15)"><path d="M10 30 L50 10 L90 30 L50 50 Z" fill="#5c2d2d"/><path d="M10 30 L10 70 L50 90 L50 50 Z" fill="#a35252"/><path d="M50 50 L50 90 L90 70 L90 30 Z" fill="#7c3a3a"/></g></svg>;
+    const CoffeeCup = () => <svg viewBox="0 0 100 100" className="transition-transform duration-500 ease-out"><g transform="rotate(-10)"><path d="M10 90 L90 90 L85 20 L15 20 Z" fill="#fff" stroke="#d1d5db" strokeWidth="2"/><path d="M75 30 C95 40, 95 60, 75 70" stroke="#d1d5db" strokeWidth="2" fill="none"/><path d="M30 15 Q 40 10, 50 15" stroke="#a35252" strokeWidth="3" strokeLinecap="round"/><path d="M50 10 Q 60 5, 70 10" stroke="#a35252" strokeWidth="3" strokeLinecap="round"/></g></svg>;
+    const Headphones = () => <svg viewBox="0 0 100 100" className="transition-transform duration-500 ease-out"><g transform="translate(50,50) scale(1.2) rotate(10)"><path d="M20-30 A30 30 0 0 1 -20 -30" stroke="#a8a29e" strokeWidth="4" fill="none"/><path d="M-20-30 L -20 0 A10 10 0 0 0 -30 10 L -30 20 A10 10 0 0 0 -20 30 L -20 10" fill="#e7e5e4" stroke="#a8a29e" strokeWidth="2"/><path d="M20-30 L 20 0 A10 10 0 0 1 30 10 L 30 20 A10 10 0 0 1 20 30 L 20 10" fill="#e7e5e4" stroke="#a8a29e" strokeWidth="2"/></g></svg>;
+    const Compass = () => <svg viewBox="0 0 100 100" className="transition-transform duration-500 ease-out compass-svg"><g transform="translate(50,50)"><circle cx="0" cy="0" r="45" fill="white" stroke="#d1d5db" strokeWidth="2"/><path d="M0-35 L10 0 L0 35 L-10 0Z" fill="#a35252"/><path d="M0-35 L-10 0 L0 35 L10 0Z" fill="#e7e5e4"/><circle cx="0" cy="0" r="5" fill="#a35252"/></g></svg>;
+    const PaperPlane = () => <svg viewBox="0 0 100 100" className="transition-transform duration-500 ease-out"><g transform="translate(50,50) rotate(-20) scale(1.2)"><path d="M0 -40 L 40 30 L 0 10 L -40 30 Z" fill="#a8a29e"/><path d="M0 -40 L 0 10 L 10 15" fill="#e7e5e4"/></g></svg>;
+
+    // --- STYLE INJECTOR ---
+
+    const StyleInjector = () => {
+        useEffect(() => {
+            const style = document.createElement('style');
+            style.textContent = `
+                    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500&family=Playfair+Display:wght@400;700&family=Kalam&display=swap');
+                    :root { --ivory: #fdfdfb; --charcoal: #333333; --stone-200: #e7e5e4; --stone-500: #78716c; --stone-600: #57534e; --stone-700: #44403c; --stone-800: #292524; --gradient-start: #fdfdfb; --gradient-end: #fff0f5; }
+                    body { font-family: 'Inter', sans-serif; color: var(--charcoal); scroll-behavior: smooth; }
+                    .font-body { font-family: 'Inter', sans-serif; }
+                    .font-serif-display { font-family: 'Playfair Display', serif; }
+                    .font-handwriting { font-family: 'Kalam', cursive; }
+                    .animated-gradient { background: linear-gradient(135deg, var(--gradient-start), var(--gradient-end)); background-size: 200% 200%; animation: gradient-animation 15s ease infinite; }
+                    @keyframes gradient-animation { 0% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } 100% { background-position: 0% 50%; } }
+                    .graphic-container:hover svg { transform: scale(1.1) rotate(-5deg) !important; }
+                    .compass-svg:hover g { transform: translate(50,50) rotate(360deg); transition: transform 1s ease-out; }
+                    .animate-draw { stroke-dasharray: 1000; stroke-dashoffset: 1000; animation: draw-animation 5s ease-out forwards; }
+                    @keyframes draw-animation { to { stroke-dashoffset: 0; } }
+                    @keyframes float { 0% { transform: translate(-50%, -50%) translateY(0px); } 50% { transform: translate(-50%, -50%) translateY(-15px); } 100% { transform: translate(-50%, -50%) translateY(0px); } }
+                    .animate-float { animation: float 6s ease-in-out infinite; }
+                `;
+            document.head.appendChild(style);
+            return () => document.head.removeChild(style);
+        }, []);
+        return null;
+    };
+
+    ReactDOM.render(<App />, document.getElementById('root'));
+</script>
+</body>
+</html>
