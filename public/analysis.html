@@ -107,24 +107,52 @@
                         const html = await response.text();
                         const parser = new DOMParser();
                         const doc = parser.parseFromString(html, 'text/html');
+                        // Get all links and filter out directories and special links
                         const links = Array.from(doc.querySelectorAll('a[href]'));
                         const files = [];
                         const seenFiles = new Set();
                         
                         for (const link of links) {
                             let href = link.getAttribute('href');
-                            if (!href || href === '#' || href === '/' || href === '../' || 
-                                href.startsWith('?') || href.includes('github.com')) continue;
                             
-                            href = href.split('?')[0];
-                            if (href.endsWith('/.preview')) href = href.replace('/.preview', '');
+                            // Skip invalid or special links
+                            if (!href || 
+                                href === '#' || 
+                                href === '/' || 
+                                href === '../' || 
+                                href.startsWith('?') || 
+                                href.includes('github.com') ||
+                                href.startsWith('mailto:')) {
+                                continue;
+                            }
+                            
+                            // Clean up the href
+                            href = href.split('?')[0];  // Remove query parameters
+                            href = href.split('#')[0];  // Remove fragments
+                            
+                            // Handle preview links and normalize path
+                            if (href.endsWith('/.preview')) {
+                                href = href.replace('/.preview', '');
+                            }
+                            
+                            // Get just the filename
                             const cleanHref = href.replace(/\/$/, '');
                             const filename = cleanHref.split('/').pop();
                             
-                            if (!filename || seenFiles.has(filename) || href.endsWith('/')) continue;
+                            // Skip if no filename, already seen, or is a directory
+                            if (!filename || seenFiles.has(filename) || href.endsWith('/')) {
+                                continue;
+                            }
+                            
+                            // Skip common web server files
+                            const lowerFilename = filename.toLowerCase();
+                            if (['index.html', 'index.htm', 'thumbs.db', '.ds_store', 'desktop.ini'].includes(lowerFilename)) {
+                                continue;
+                            }
                             
                             seenFiles.add(filename);
                             files.push(filename);
+                            console.log(`Found file: ${filename}`);
                         }
                         return files;
                     }
@@ -138,9 +166,16 @@
             const scanFolders = async () => {
                 const isNetlify = window.location.hostname.includes('netlify.app');
                 const config = isNetlify ? fileConfig.netlify : fileConfig.local;
-                const photoExtensions = new Set(['jpg', 'jpeg', 'png', 'webp']);
-                const audioExtensions = new Set(['mp3', 'wav', 'mp4', 'm4a']);
-                const videoExtensions = new Set(['mp4', 'mov', 'avi', 'mkv']);
+                // Include all common image, audio, and video formats
+                const photoExtensions = new Set([
+                    'jpg', 'jpeg', 'png', 'webp', 'gif', 'bmp', 'tiff', 'svg', 'heic', 'heif'
+                ]);
+                const audioExtensions = new Set([
+                    'mp3', 'wav', 'm4a', 'aac', 'ogg', 'oga', 'flac', 'wma', 'aiff', 'm4b'
+                ]);
+                const videoExtensions = new Set([
+                    'mp4', 'mov', 'avi', 'mkv', 'webm', 'wmv', 'flv', 'm4v', '3gp', 'mpeg', 'mpg'
+                ]);
                 const chatExtensions = new Set(['html', 'txt']);
 
                 const filterFilesByExtension = (files, extensions) => 
