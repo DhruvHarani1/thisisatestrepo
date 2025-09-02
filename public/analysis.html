@@ -38,6 +38,27 @@
             const [lastUpdated, setLastUpdated] = useState(new Date().toLocaleTimeString());
             const chartRef = useRef(null);
             const chartInstance = useRef(null);
+            
+            // Environment configuration
+            const isNetlify = window.location.hostname.includes('netlify.app');
+            const fileConfig = {
+                netlify: {
+                    basePath: '',
+                    photos: '/photos/',
+                    audio: '/audio/',
+                    videos: '/videos/',
+                    instachat: '/instachat/',
+                    whatappchat: '/whatappchat/'
+                },
+                local: {
+                    basePath: '/public',
+                    photos: '/public/photos/',
+                    audio: '/public/audio/',
+                    videos: '/public/videos/',
+                    instachat: '/public/instachat/',
+                    whatappchat: '/public/whatappchat/'
+                }
+            };
 
             // Helper to list files in a directory using fetch
             const listFilesInDirectory = async (dir) => {
