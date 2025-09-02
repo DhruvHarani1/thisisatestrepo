@@ -184,12 +184,49 @@
                     });
                 };
 
-                // Create file objects for each type
-                const photos = createFileObjects(photoFiles, 'photo', 'photos', photoExtensions);
-                const audio = createFileObjects(audioFiles, 'audio', 'audio', audioExtensions);
-                const videos = createFileObjects(videoFiles, 'video', 'videos', videoExtensions);
+                // Special handling for photos
+                const photos = filterFilesByExtension(photoFiles, photoExtensions).map(file => {
+                    const cleanFile = file.replace(/^[./]+/, '');
+                    const path = isNetlify ? `/photos/${cleanFile}` : `${config.photos}${cleanFile}`;
+                    console.log(`Photo path: ${path}`);
+                    return {
+                        type: 'photo',
+                        path: path,
+                        filename: cleanFile,
+                        timestamp: Date.now(),
+                        size: 0
+                    };
+                });
+
+                // Special handling for audio files
+                const audio = filterFilesByExtension(audioFiles, audioExtensions).map(file => {
+                    const cleanFile = file.replace(/^[./]+/, '');
+                    const path = isNetlify ? `/audio/${cleanFile}` : `${config.audio}${cleanFile}`;
+                    console.log(`Audio path: ${path}`);
+                    return {
+                        type: 'audio',
+                        path: path,
+                        filename: cleanFile,
+                        timestamp: Date.now(),
+                        size: 0
+                    };
+                });
+
+                // Special handling for video files
+                const videos = filterFilesByExtension(videoFiles, videoExtensions).map(file => {
+                    const cleanFile = file.replace(/^[./]+/, '');
+                    const path = isNetlify ? `/videos/${cleanFile}` : `${config.videos}${cleanFile}`;
+                    console.log(`Video path: ${path}`);
+                    return {
+                        type: 'video',
+                        path: path,
+                        filename: cleanFile,
+                        timestamp: Date.now(),
+                        size: 0
+                    };
+                });
                 
-                // Special handling for chat files - use correct directory names without 's' at the end
+                // Special handling for Instagram chat files
                 const instachat = filterFilesByExtension(instaChatFiles, chatExtensions).map(file => {
                     const cleanFile = file.replace(/^[./]+/, '');
                     const path = isNetlify ? `/instachat/${cleanFile}` : `${config.instachat}${cleanFile}`;
