@@ -511,12 +511,12 @@
             <h2 className="text-center text-3xl font-serif-display text-stone-700 mb-12">Analysis of Our Journey</h2>
             <p className="text-center text-stone-500 mb-8">Let's dive into the data and discover more about our time together.</p>
             <div className="flex flex-col items-center space-y-4">
-                <button
-                    onClick={() => window.location.href = 'analysis.html'}
-                    className="px-6 py-3 bg-emerald-400 text-white font-bold rounded-lg shadow-md hover:bg-emerald-500 transition-colors"
+                <a
+                    href="/analysis.html"
+                    className="px-6 py-3 bg-emerald-400 text-white font-bold rounded-lg shadow-md hover:bg-emerald-500 transition-colors inline-block"
                 >
                     View Analysis
-                </button>
+                </a>
             </div>
         </SectionWithGraphic>
     );
