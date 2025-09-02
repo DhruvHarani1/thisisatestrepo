@@ -188,8 +188,33 @@
                 const photos = createFileObjects(photoFiles, 'photo', 'photos', photoExtensions);
                 const audio = createFileObjects(audioFiles, 'audio', 'audio', audioExtensions);
                 const videos = createFileObjects(videoFiles, 'video', 'videos', videoExtensions);
-                const instachat = createFileObjects(instaChatFiles, 'instachat', 'instachat', chatExtensions);
-                const whatappchat = createFileObjects(whatsappChatFiles, 'whatappchat', 'whatappchat', chatExtensions);
+                
+                // Special handling for chat files - use correct directory names without 's' at the end
+                const instachat = filterFilesByExtension(instaChatFiles, chatExtensions).map(file => {
+                    const cleanFile = file.replace(/^[./]+/, '');
+                    const path = isNetlify ? `/instachat/${cleanFile}` : `${config.instachat}${cleanFile}`;
+                    console.log(`Instagram chat path: ${path}`);
+                    return {
+                        type: 'instachat',
+                        path: path,
+                        filename: cleanFile,
+                        timestamp: Date.now(),
+                        size: 0
+                    };
+                });
+
+                const whatappchat = filterFilesByExtension(whatsappChatFiles, chatExtensions).map(file => {
+                    const cleanFile = file.replace(/^[./]+/, '');
+                    const path = isNetlify ? `/whatappchat/${cleanFile}` : `${config.whatappchat}${cleanFile}`;
+                    console.log(`WhatsApp chat path: ${path}`);
+                    return {
+                        type: 'whatappchat',
+                        path: path,
+                        filename: cleanFile,
+                        timestamp: Date.now(),
+                        size: 0
+                    };
+                });
 
                 console.log('Scan result:', { 
                     photos: photos.length, 
