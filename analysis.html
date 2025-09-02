@@ -54,7 +54,9 @@
                         // Find the matching directory in our file list
                         const dirKey = Object.keys(fileList).find(key => 
                             key.toLowerCase() === dir.toLowerCase() || 
-                            key.toLowerCase() === `${dir}/`.toLowerCase()
+                            key.toLowerCase() === `${dir}/`.toLowerCase() ||
+                            key.toLowerCase() === `public/${dir}`.toLowerCase() ||
+                            key.toLowerCase() === `public/${dir}/`.toLowerCase()
                         );
                         
                         return dirKey ? fileList[dirKey] || [] : [];
