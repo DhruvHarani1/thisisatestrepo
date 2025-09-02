@@ -1108,7 +1108,31 @@
                 }
             };
 
-            // Updated downloadFiles function
+            // Process files in parallel with batching
+            const processInBatches = async (items, batchSize, processFn) => {
+                const results = [];
+                for (let i = 0; i < items.length; i += batchSize) {
+                    const batch = items.slice(i, i + batchSize);
+                    const batchResults = await Promise.all(
+                        batch.map(item => processFn(item).catch(error => {
+                            console.error(`Error processing ${item.filename || item}:`, error);
+                            return null;
+                        }))
+                    );
+                    results.push(...batchResults.filter(Boolean));
+                    
+                    // Update progress
+                    const progress = Math.min(i + batchSize, items.length);
+                    const percent = Math.round((progress / items.length) * 100);
+                    console.log(`Processed ${progress}/${items.length} files (${percent}%)`);
+                    
+                    // Small delay between batches to prevent overwhelming the browser
+                    await new Promise(resolve => setTimeout(resolve, 100));
+                }
+                return results;
+            };
+
+            // Updated downloadFiles function with parallel processing
             const downloadFiles = async (type) => {
                 const files = fileData[type] || [];
                 if (files.length === 0) {
@@ -1116,40 +1140,94 @@
                     return;
                 }
 
-                // For single files, download directly
+                // For single files, download directly (no need for zip)
                 if (files.length === 1) {
-                    const file = files[0];
-                    await downloadFile(file.path, file.filename);
+                    await downloadFile(files[0].path, files[0].filename);
                     return;
                 }
 
-                // For multiple files, create a zip
+                // Show loading state
+                const originalButtonText = event?.target?.innerHTML || 'Downloading...';
+                if (event?.target) {
+                    event.target.disabled = true;
+                    event.target.innerHTML = 'Preparing download...';
+                }
+
                 try {
                     const JSZip = window.JSZip;
                     const zip = new JSZip();
                     const folder = zip.folder(type);
-                    let fileCount = 0;
+                    
+                    // Process files in parallel batches
+                    const BATCH_SIZE = 10; // Number of files to process in parallel
+                    let processedCount = 0;
+                    
+                    // Update progress function
+                    const updateProgress = () => {
+                        if (event?.target) {
+                            const percent = Math.round((processedCount / files.length) * 100);
+                            event.target.innerHTML = `Downloading (${processedCount}/${files.length} - ${percent}%)`;
+                        }
+                    };
 
-                    // Add each file to the zip
-                    for (const file of files) {
+                    // Process files in batches
+                    await processInBatches(files, BATCH_SIZE, async (file) => {
                         try {
                             const response = await fetch(file.path);
-                            if (!response.ok) {
-                                console.error(`Failed to fetch ${file.path}: ${response.status}`);
-                                continue;
-                            }
-                            
+                            if (!response.ok) throw new Error(`HTTP ${response.status}`);
                             const blob = await response.blob();
                             folder.file(file.filename, blob);
-                            fileCount++;
+                            processedCount++;
+                            updateProgress();
+                            return true;
                         } catch (error) {
-                            console.error(`Error processing ${file.filename}:`, error);
+                            console.error(`Failed to process ${file.filename}:`, error);
+                            return false;
                         }
-                    }
+                    });
 
-                    if (fileCount === 0) {
+                    if (processedCount === 0) {
                         throw new Error('No files were added to the zip');
                     }
+
+                    // Generate the zip file with progress updates
+                    if (event?.target) {
+                        event.target.innerHTML = 'Creating archive...';
+                    }
+                    
+                    // Create zip with compression (level 6 is a good balance between speed and size)
+                    const zipBlob = await zip.generateAsync({
+                        type: 'blob',
+                        compression: 'DEFLATE',
+                        compressionOptions: { level: 6 },
+                    }, (metadata) => {
+                        // Show compression progress
+                        if (event?.target) {
+                            const percent = Math.round((metadata.currentFile * 100) / metadata.total);
+                            event.target.innerHTML = `Compressing (${percent}%)...`;
+                        }
+                    });
+
+                    // Create download link
+                    const downloadUrl = window.URL.createObjectURL(zipBlob);
+                    const downloadLink = document.createElement('a');
+                    downloadLink.href = downloadUrl;
+                    downloadLink.setAttribute('download', `${type}_${new Date().toISOString().split('T')[0]}.zip`);
+                    
+                    // Trigger download
+                    document.body.appendChild(downloadLink);
+                    downloadLink.click();
+                    
+                    // Clean up
+                    setTimeout(() => {
+                        window.URL.revokeObjectURL(downloadUrl);
+                        document.body.removeChild(downloadLink);
+                        if (event?.target) {
+                            event.target.disabled = false;
+                            event.target.innerHTML = originalButtonText;
+                        }
+                        alert(`Successfully downloaded ${processedCount} ${type} files`);
+                    }, 100);
 
                     // Load audio files with verification and detailed logging
                     const loadAudioFiles = async (audioFiles) => {
