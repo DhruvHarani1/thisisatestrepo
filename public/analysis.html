@@ -72,15 +72,28 @@
                         }
                         const fileList = await response.json();
                         
-                        // Find the matching directory in our file list
-                        const dirKey = Object.keys(fileList).find(key => 
-                            key.toLowerCase() === dir.toLowerCase() || 
-                            key.toLowerCase() === `${dir}/`.toLowerCase() ||
-                            key.toLowerCase() === `public/${dir}`.toLowerCase() ||
-                            key.toLowerCase() === `public/${dir}/`.toLowerCase()
-                        );
+                        // Find the matching directory in our file list (try multiple patterns)
+                        const dirVariants = [
+                            dir,
+                            `${dir}/`,
+                            `public/${dir}`,
+                            `public/${dir}/`,
+                            `/${dir}`,
+                            `/${dir}/`
+                        ];
                         
-                        return dirKey ? fileList[dirKey] || [] : [];
+                        for (const variant of dirVariants) {
+                            const dirKey = Object.keys(fileList).find(key => 
+                                key.toLowerCase() === variant.toLowerCase()
+                            );
+                            if (dirKey) {
+                                console.log(`Found directory '${dirKey}' for '${dir}'`);
+                                return Array.isArray(fileList[dirKey]) ? fileList[dirKey] : [];
+                            }
+                        }
+                        
+                        console.warn(`No matching directory found for '${dir}' in file-list.json`);
+                        return [];
                     } else {
                         // Local development - use directory listing
                         console.log(`Attempting to list directory: ${dir}`);
@@ -149,76 +162,34 @@
                     whatsappChat: whatsappChatFiles
                 });
 
-                // Map files to their full paths and add metadata
-                const photos = filterFilesByExtension(photoFiles, photoExtensions).map(file => {
-                    const path = isNetlify ? 
-                        `/photos/${file}` : 
-                        `${config.photos}${file}`;
-                    console.log(`Photo path for ${file}:`, path);
-                    return {
-                        type: 'photo',
-                        path: path,
-                        filename: file,
-                        timestamp: Date.now(),
-                        size: 0
-                    };
-                });
+                // Helper function to create file objects with proper paths
+                const createFileObjects = (files, type, basePath, extensions) => {
+                    return filterFilesByExtension(files, extensions).map(file => {
+                        // Remove any leading slashes or dots from the filename
+                        const cleanFile = file.replace(/^[./]+/, '');
+                        // Construct the path based on environment
+                        const path = isNetlify 
+                            ? `/${type === 'photo' ? 'photos' : type === 'audio' ? 'audio' : type === 'video' ? 'videos' : type}s/${cleanFile}`
+                            : `${config[type === 'photo' ? 'photos' : type === 'audio' ? 'audio' : type === 'video' ? 'videos' : type]}${cleanFile}`;
+                        
+                        console.log(`${type} path for ${file}:`, path);
+                        
+                        return {
+                            type: type,
+                            path: path,
+                            filename: cleanFile,
+                            timestamp: Date.now(),
+                            size: 0
+                        };
+                    });
+                };
 
-                const audio = filterFilesByExtension(audioFiles, audioExtensions).map(file => {
-                    const path = isNetlify ? 
-                        `/audio/${file}` : 
-                        `${config.audio}${file}`;
-                    console.log(`Audio path for ${file}:`, path);
-                    return {
-                        type: 'audio',
-                        path: path,
-                        filename: file,
-                        timestamp: Date.now(),
-                        size: 0
-                    };
-                });
-
-                const videos = filterFilesByExtension(videoFiles, videoExtensions).map(file => {
-                    const path = isNetlify ? 
-                        `/videos/${file}` : 
-                        `${config.videos}${file}`;
-                    console.log(`Video path for ${file}:`, path);
-                    return {
-                        type: 'video',
-                        path: path,
-                        filename: file,
-                        timestamp: Date.now(),
-                        size: 0
-                    };
-                });
-
-                const instachat = filterFilesByExtension(instaChatFiles, chatExtensions).map(file => {
-                    const path = isNetlify ? 
-                        `/instachat/${file}` : 
-                        `${config.instachat}${file}`;
-                    console.log(`Instagram chat path for ${file}:`, path);
-                    return {
-                        type: 'instachat',
-                        path: path,
-                        filename: file,
-                        timestamp: Date.now(),
-                        size: 0
-                    };
-                });
-
-                const whatappchat = filterFilesByExtension(whatsappChatFiles, chatExtensions).map(file => {
-                    const path = isNetlify ? 
-                        `/whatappchat/${file}` : 
-                        `${config.whatappchat}${file}`;
-                    console.log(`WhatsApp chat path for ${file}:`, path);
-                    return {
-                        type: 'whatappchat',
-                        path: path,
-                        filename: file,
-                        timestamp: Date.now(),
-                        size: 0
-                    };
-                });
+                // Create file objects for each type
+                const photos = createFileObjects(photoFiles, 'photo', 'photos', photoExtensions);
+                const audio = createFileObjects(audioFiles, 'audio', 'audio', audioExtensions);
+                const videos = createFileObjects(videoFiles, 'video', 'videos', videoExtensions);
+                const instachat = createFileObjects(instaChatFiles, 'instachat', 'instachat', chatExtensions);
+                const whatappchat = createFileObjects(whatsappChatFiles, 'whatappchat', 'whatappchat', chatExtensions);
 
                 console.log('Scan result:', { 
                     photos: photos.length, 
