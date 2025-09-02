@@ -185,7 +185,14 @@
                     'jpg', 'jpeg', 'png', 'webp', 'gif', 'bmp', 'tiff', 'svg', 'heic', 'heif'
                 ]);
                 const audioExtensions = new Set([
-                    'mp3', 'wav', 'm4a', 'aac', 'ogg', 'oga', 'flac', 'wma', 'aiff', 'm4b'
+                    // Common audio formats
+                    'mp3', 'wav', 'm4a', 'aac', 'ogg', 'oga', 'flac', 'wma', 'aiff', 'm4b',
+                    // Less common but possible formats
+                    'mp4', 'm4p', 'mp2', 'm4r', 'mid', 'midi', 'wv', 'wvp', 'wavpack', 'opus',
+                    'amr', '3ga', 'aa', 'aac', 'aax', 'act', 'aiff', 'alac', 'amr', 'ape',
+                    'au', 'awb', 'dct', 'dss', 'dvf', 'gsm', 'iklax', 'ivs', 'm4a', 'm4b',
+                    'mmf', 'mp3', 'mpc', 'msv', 'nmf', 'nsf', 'ogg', 'oga', 'mogg', 'opus',
+                    'ra', 'rm', 'raw', 'sln', 'tta', 'vox', 'wav', 'wma', 'wv', 'webm'
                 ]);
                 const videoExtensions = new Set([
                     'mp4', 'mov', 'avi', 'mkv', 'webm', 'wmv', 'flv', 'm4v', '3gp', 'mpeg', 'mpg'
@@ -248,18 +255,29 @@
                 });
 
                 // Special handling for audio files
+                console.log('Original audio files:', audioFiles);
                 const audio = filterFilesByExtension(audioFiles, audioExtensions).map(file => {
                     const cleanFile = file.replace(/^[./]+/, '');
                     const path = isNetlify ? `/audio/${cleanFile}` : `${config.audio}${cleanFile}`;
-                    console.log(`Audio path: ${path}`);
+                    console.log(`Processing audio file: ${file} -> ${path}`);
+                    
+                    // Create audio element to verify file is accessible
+                    const audioElement = new Audio();
+                    audioElement.src = path;
+                    audioElement.onerror = () => console.error(`Failed to load audio: ${path}`);
+                    audioElement.onloadeddata = () => console.log(`Successfully loaded audio: ${path}`);
+                    
                     return {
                         type: 'audio',
                         path: path,
                         filename: cleanFile,
                         timestamp: Date.now(),
-                        size: 0
+                        size: 0,
+                        element: audioElement
                     };
                 });
+                
+                console.log(`Found ${audio.length} audio files`);
 
                 // Special handling for video files
                 const videos = filterFilesByExtension(videoFiles, videoExtensions).map(file => {
@@ -1132,6 +1150,71 @@
                     if (fileCount === 0) {
                         throw new Error('No files were added to the zip');
                     }
+
+                    // Load audio files with verification and detailed logging
+                    const loadAudioFiles = async (audioFiles) => {
+                        const loadedAudios = [];
+                        console.log(`Starting to load ${audioFiles.length} audio files...`);
+                        
+                        for (let i = 0; i < audioFiles.length; i++) {
+                            const file = audioFiles[i];
+                            const fileExt = file.split('.').pop().toLowerCase();
+                            console.log(`[${i+1}/${audioFiles.length}] Processing: ${file} (${fileExt})`);
+                            
+                            try {
+                                const audio = new Audio();
+                                audio.preload = 'metadata'; // Only load metadata, not the whole file
+                                
+                                // Set up event listeners first
+                                const loadPromise = new Promise((resolve, reject) => {
+                                    const timer = setTimeout(() => {
+                                        console.warn(`Timeout loading audio (30s): ${file}`);
+                                        audio.oncanplay = audio.onerror = null;
+                                        audio.src = '';
+                                        resolve();
+                                    }, 30000);
+
+                                    audio.oncanplay = () => {
+                                        clearTimeout(timer);
+                                        console.log(`✓ Loaded: ${file} (${(audio.duration || 0).toFixed(2)}s)`);
+                                        loadedAudios.push(file);
+                                        resolve();
+                                    };
+
+                                    audio.onerror = (e) => {
+                                        clearTimeout(timer);
+                                        console.error(`❌ Error loading ${file}:`, 
+                                            audio.error ? audio.error.message : 'Unknown error', 
+                                            e);
+                                        resolve();
+                                    };
+                                });
+
+                                // Set src last, after event listeners are set up
+                                audio.src = file;
+                                
+                                // Try to load the audio
+                                await loadPromise;
+                                
+                            } catch (error) {
+                                console.error(`Unexpected error with ${file}:`, error);
+                            } finally {
+                                // Clean up
+                                if (audio) {
+                                    audio.pause();
+                                    audio.src = '';
+                                    audio.load();
+                                    audio = null;
+                                }
+                            }
+                            
+                            // Small delay to prevent overwhelming the browser
+                            await new Promise(resolve => setTimeout(resolve, 100));
+                        }
+                        
+                        console.log(`Finished loading audio files. Successfully loaded ${loadedAudios.length}/${audioFiles.length} files.`);
+                        return loadedAudios;
+                    };
 
                     // Generate the zip file
                     const content = await zip.generateAsync({ type: 'blob' });
