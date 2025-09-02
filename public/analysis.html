@@ -150,55 +150,75 @@
                 });
 
                 // Map files to their full paths and add metadata
-                const photos = filterFilesByExtension(photoFiles, photoExtensions).map(file => ({
-                    type: 'photo',
-                    path: isNetlify ? 
-                        `${config.basePath}/photos/${file}` : 
-                        `${config.photos}${file}`,
-                    filename: file,
-                    timestamp: Date.now(),
-                    size: 0
-                }));
+                const photos = filterFilesByExtension(photoFiles, photoExtensions).map(file => {
+                    const path = isNetlify ? 
+                        `/photos/${file}` : 
+                        `${config.photos}${file}`;
+                    console.log(`Photo path for ${file}:`, path);
+                    return {
+                        type: 'photo',
+                        path: path,
+                        filename: file,
+                        timestamp: Date.now(),
+                        size: 0
+                    };
+                });
 
-                const audio = filterFilesByExtension(audioFiles, audioExtensions).map(file => ({
-                    type: 'audio',
-                    path: isNetlify ? 
-                        `${config.basePath}/audio/${file}` : 
-                        `${config.audio}${file}`,
-                    filename: file,
-                    timestamp: Date.now(),
-                    size: 0
-                }));
+                const audio = filterFilesByExtension(audioFiles, audioExtensions).map(file => {
+                    const path = isNetlify ? 
+                        `/audio/${file}` : 
+                        `${config.audio}${file}`;
+                    console.log(`Audio path for ${file}:`, path);
+                    return {
+                        type: 'audio',
+                        path: path,
+                        filename: file,
+                        timestamp: Date.now(),
+                        size: 0
+                    };
+                });
 
-                const videos = filterFilesByExtension(videoFiles, videoExtensions).map(file => ({
-                    type: 'video',
-                    path: isNetlify ? 
-                        `${config.basePath}/videos/${file}` : 
-                        `${config.videos}${file}`,
-                    filename: file,
-                    timestamp: Date.now(),
-                    size: 0
-                }));
+                const videos = filterFilesByExtension(videoFiles, videoExtensions).map(file => {
+                    const path = isNetlify ? 
+                        `/videos/${file}` : 
+                        `${config.videos}${file}`;
+                    console.log(`Video path for ${file}:`, path);
+                    return {
+                        type: 'video',
+                        path: path,
+                        filename: file,
+                        timestamp: Date.now(),
+                        size: 0
+                    };
+                });
 
-                const instachat = filterFilesByExtension(instaChatFiles, chatExtensions).map(file => ({
-                    type: 'instachat',
-                    path: isNetlify ? 
-                        `${config.basePath}/instachat/${file}` : 
-                        `${config.instachat}${file}`,
-                    filename: file,
-                    timestamp: Date.now(),
-                    size: 0
-                }));
+                const instachat = filterFilesByExtension(instaChatFiles, chatExtensions).map(file => {
+                    const path = isNetlify ? 
+                        `/instachat/${file}` : 
+                        `${config.instachat}${file}`;
+                    console.log(`Instagram chat path for ${file}:`, path);
+                    return {
+                        type: 'instachat',
+                        path: path,
+                        filename: file,
+                        timestamp: Date.now(),
+                        size: 0
+                    };
+                });
 
-                const whatappchat = filterFilesByExtension(whatsappChatFiles, chatExtensions).map(file => ({
-                    type: 'whatappchat',
-                    path: isNetlify ? 
-                        `${config.basePath}/whatappchat/${file}` : 
-                        `${config.whatappchat}${file}`,
-                    filename: file,
-                    timestamp: Date.now(),
-                    size: 0
-                }));
+                const whatappchat = filterFilesByExtension(whatsappChatFiles, chatExtensions).map(file => {
+                    const path = isNetlify ? 
+                        `/whatappchat/${file}` : 
+                        `${config.whatappchat}${file}`;
+                    console.log(`WhatsApp chat path for ${file}:`, path);
+                    return {
+                        type: 'whatappchat',
+                        path: path,
+                        filename: file,
+                        timestamp: Date.now(),
+                        size: 0
+                    };
+                });
 
                 console.log('Scan result:', { 
                     photos: photos.length, 
