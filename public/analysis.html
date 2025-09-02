@@ -123,6 +123,7 @@
 
             // Dynamic file scanning function
             const scanFolders = async () => {
+                const isNetlify = window.location.hostname.includes('netlify.app');
                 const config = isNetlify ? fileConfig.netlify : fileConfig.local;
                 const photoExtensions = new Set(['jpg', 'jpeg', 'png', 'webp']);
                 const audioExtensions = new Set(['mp3', 'wav', 'mp4', 'm4a']);
@@ -133,12 +134,20 @@
                     files.filter(file => extensions.has(file.split('.').pop().toLowerCase()));
 
                 const [photoFiles, audioFiles, videoFiles, instaChatFiles, whatsappChatFiles] = await Promise.all([
-                    listFilesInDirectory(config.photos),
-                    listFilesInDirectory(config.audio),
-                    listFilesInDirectory(config.videos),
-                    listFilesInDirectory(config.instachat),
-                    listFilesInDirectory(config.whatappchat)
+                    listFilesInDirectory('photos'),
+                    listFilesInDirectory('audio'),
+                    listFilesInDirectory('videos'),
+                    listFilesInDirectory('instachat'),
+                    listFilesInDirectory('whatappchat')
                 ]);
+                
+                console.log('Files found:', {
+                    photos: photoFiles,
+                    audio: audioFiles,
+                    videos: videoFiles,
+                    instaChat: instaChatFiles,
+                    whatsappChat: whatsappChatFiles
+                });
 
                 // Map files to their full paths and add metadata
                 const photos = filterFilesByExtension(photoFiles, photoExtensions).map(file => ({
