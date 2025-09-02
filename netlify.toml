@@ -1,6 +1,6 @@
 [build]
 publish = "public"
-command = ""
+command = "npm run generate-file-list"
 
 [[redirects]]
   from = "/*"

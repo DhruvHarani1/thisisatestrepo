@@ -1,0 +1,12 @@
+{
+  "name": "trisha-dhruv-memories",
+  "version": "1.0.0",
+  "description": "A beautiful collection of our memories",
+  "main": "index.js",
+  "scripts": {
+    "generate-file-list": "node scripts/generate-file-list.js",
+    "build": "npm run generate-file-list"
+  },
+  "dependencies": {},
+  "devDependencies": {}
+}

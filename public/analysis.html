@@ -64,36 +64,50 @@
             const listFilesInDirectory = async (dir) => {
                 try {
                     if (window.location.hostname.includes('netlify.app')) {
-                        // For Netlify, load from our pre-defined file list
-                        const response = await fetch('/file-list.json');
-                        if (!response.ok) {
-                            console.error('Failed to load file list:', response.status);
+                        console.log('Running on Netlify, fetching file-list.json...');
+                        try {
+                            const response = await fetch('/file-list.json');
+                            if (!response.ok) {
+                                console.error('Failed to load file list:', response.status, response.statusText);
+                                return [];
+                            }
+                            const fileList = await response.json();
+                            console.log('File list keys:', Object.keys(fileList));
+                            
+                            // Find the matching directory in our file list (try multiple patterns)
+                            const dirVariants = [
+                                dir,
+                                `${dir}/`,
+                                `public/${dir}`,
+                                `public/${dir}/`,
+                                `/${dir}`,
+                                `/${dir}/`,
+                                `public/${dir}s/`,  // Try with 's' suffix
+                                `/${dir}s/`,
+                                `${dir}s/`,
+                                `${dir}s`
+                            ];
+                            
+                            console.log(`Trying to match directory: ${dir}`);
+                            console.log('Trying variants:', dirVariants);
+                            
+                            for (const variant of dirVariants) {
+                                const dirKey = Object.keys(fileList).find(key => 
+                                    key.toLowerCase() === variant.toLowerCase()
+                                );
+                                if (dirKey) {
+                                    const files = fileList[dirKey];
+                                    console.log(`Found directory '${dirKey}' with ${Array.isArray(files) ? files.length : 'unknown number of'} files`);
+                                    console.log('Sample files:', Array.isArray(files) ? files.slice(0, 5) : 'N/A');
+                                    return Array.isArray(files) ? files : [];
+                                }
+                            }
+                            console.warn(`No matching directory found for '${dir}' in file-list.json`);
+                            return [];
+                        } catch (error) {
+                            console.error('Error processing file list:', error);
                             return [];
                         }
-                        const fileList = await response.json();
-                        
-                        // Find the matching directory in our file list (try multiple patterns)
-                        const dirVariants = [
-                            dir,
-                            `${dir}/`,
-                            `public/${dir}`,
-                            `public/${dir}/`,
-                            `/${dir}`,
-                            `/${dir}/`
-                        ];
-                        
-                        for (const variant of dirVariants) {
-                            const dirKey = Object.keys(fileList).find(key => 
-                                key.toLowerCase() === variant.toLowerCase()
-                            );
-                            if (dirKey) {
-                                console.log(`Found directory '${dirKey}' for '${dir}'`);
-                                return Array.isArray(fileList[dirKey]) ? fileList[dirKey] : [];
-                            }
-                        }
-                        
-                        console.warn(`No matching directory found for '${dir}' in file-list.json`);
-                        return [];
                     } else {
                         // Local development - use directory listing
                         console.log(`Attempting to list directory: ${dir}`);
