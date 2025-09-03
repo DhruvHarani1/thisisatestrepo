@@ -1108,26 +1108,61 @@
                 }
             };
 
-            // Process files in parallel with batching
-            const processInBatches = async (items, batchSize, processFn) => {
+            // Process files in parallel with batching and progress tracking
+            const processInBatches = async (items, batchSize, processFn, type) => {
                 const results = [];
-                for (let i = 0; i < items.length; i += batchSize) {
-                    const batch = items.slice(i, i + batchSize);
-                    const batchResults = await Promise.all(
-                        batch.map(item => processFn(item).catch(error => {
-                            console.error(`Error processing ${item.filename || item}:`, error);
-                            return null;
-                        }))
+                let processedCount = 0;
+                const totalFiles = items.length;
+                
+                // Adjust batch size based on file type
+                const adjustedBatchSize = type === 'photos' || type === 'videos' ? 3 : 10;
+                
+                // Update progress function
+                const updateProgress = (current, total) => {
+                    const percent = Math.round((current / total) * 100);
+                    console.log(`Processed ${current}/${total} files (${percent}%)`);
+                    if (event?.target) {
+                        event.target.innerHTML = `Processing ${type} (${current}/${total} - ${percent}%)`;
+                    }
+                };
+
+                // Process in smaller batches for large files
+                for (let i = 0; i < items.length; i += adjustedBatchSize) {
+                    const batch = items.slice(i, i + adjustedBatchSize);
+                    const batchPromises = batch.map(item => 
+                        processFn(item)
+                            .then(result => {
+                                processedCount++;
+                                updateProgress(processedCount, totalFiles);
+                                return result;
+                            })
+                            .catch(error => {
+                                console.error(`Error processing ${item.filename || item}:`, error);
+                                processedCount++;
+                                updateProgress(processedCount, totalFiles);
+                                return null;
+                            })
                     );
+
+                    // Process batch with timeout to prevent hanging
+                    const timeoutPromise = new Promise(resolve => 
+                        setTimeout(() => resolve(null), 30000) // 30s timeout per batch
+                    );
+
+                    const batchResults = await Promise.race([
+                        Promise.all(batchPromises),
+                        timeoutPromise.then(() => {
+                            console.warn(`Batch ${i / adjustedBatchSize + 1} timed out`);
+                            return batch.map(() => null);
+                        })
+                    ]);
+
                     results.push(...batchResults.filter(Boolean));
                     
-                    // Update progress
-                    const progress = Math.min(i + batchSize, items.length);
-                    const percent = Math.round((progress / items.length) * 100);
-                    console.log(`Processed ${progress}/${items.length} files (${percent}%)`);
-                    
-                    // Small delay between batches to prevent overwhelming the browser
-                    await new Promise(resolve => setTimeout(resolve, 100));
+                    // Add delay between batches, longer for media files
+                    await new Promise(resolve => 
+                        setTimeout(resolve, type === 'photos' || type === 'videos' ? 500 : 100)
+                    );
                 }
                 return results;
             };
@@ -1170,24 +1205,57 @@
                         }
                     };
 
-                    // Process files in batches
-                    await processInBatches(files, BATCH_SIZE, async (file) => {
+                    // Process files in batches with optimized handling for large files
+                    const successfulFiles = await processInBatches(files, BATCH_SIZE, async (file) => {
                         try {
-                            const response = await fetch(file.path);
+                            const controller = new AbortController();
+                            const timeoutId = setTimeout(() => controller.abort(), 60000); // 1 minute timeout
+                            
+                            const response = await fetch(file.path, { 
+                                signal: controller.signal,
+                                cache: 'force-cache' // Use cached version if available
+                            });
+                            clearTimeout(timeoutId);
+                            
                             if (!response.ok) throw new Error(`HTTP ${response.status}`);
-                            const blob = await response.blob();
+                            
+                            // For large files, use streaming approach
+                            const reader = response.body.getReader();
+                            const contentLength = +response.headers.get('Content-Length');
+                            let receivedLength = 0;
+                            const chunks = [];
+                            
+                            while (true) {
+                                const { done, value } = await reader.read();
+                                if (done) break;
+                                chunks.push(value);
+                                receivedLength += value.length;
+                                
+                                // Update progress for large files
+                                if (contentLength > 1024 * 1024) { // Only for files > 1MB
+                                    const percent = Math.round((receivedLength / contentLength) * 100);
+                                    if (event?.target) {
+                                        event.target.innerHTML = `Downloading ${file.filename} (${Math.round(receivedLength/1024/1024)}MB/${Math.round(contentLength/1024/1024)}MB - ${percent}%)`;
+                                    }
+                                }
+                            }
+                            
+                            const blob = new Blob(chunks);
                             folder.file(file.filename, blob);
-                            processedCount++;
-                            updateProgress();
                             return true;
+                            
                         } catch (error) {
                             console.error(`Failed to process ${file.filename}:`, error);
                             return false;
                         }
-                    });
+                    }, type);
+                    
+                    const successfulCount = successfulFiles.filter(Boolean).length;
 
-                    if (processedCount === 0) {
+                    if (successfulCount === 0) {
                         throw new Error('No files were added to the zip');
+                    } else {
+                        console.log(`Successfully processed ${successfulCount}/${files.length} files`);
                     }
 
                     // Generate the zip file with progress updates
