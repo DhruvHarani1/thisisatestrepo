@@ -1066,25 +1066,42 @@
 
             const downloadFile = async (filePath, fileName) => {
                 try {
-                    // Ensure filePath is a valid URL or relative path
-                    let actualPath = filePath;
+                    console.log('Original file path:', filePath);
+                    console.log('File name:', fileName);
                     
-                    // If it's a relative path without leading slash, add one
-                    if (!filePath.startsWith('http') && !filePath.startsWith('/') && !filePath.startsWith('./')) {
-                        actualPath = `/${filePath}`;
+                    // Create a new URL object to handle the path properly
+                    let url;
+                    try {
+                        // First try to create a URL object directly
+                        url = new URL(filePath, window.location.origin);
+                    } catch (e) {
+                        // If it's not a valid URL, treat it as a relative path
+                        const baseUrl = window.location.origin;
+                        // Ensure there's exactly one slash between base URL and path
+                        const cleanPath = filePath.replace(/^\/+/, '');
+                        url = new URL(cleanPath, baseUrl);
                     }
                     
                     // For local development, use the full path
                     if (!window.location.hostname.includes('netlify.app')) {
-                        // Remove any leading slashes to prevent double slashes
-                        actualPath = actualPath.replace(/^\/+/, '');
+                        // Remove any double slashes that might occur
+                        const cleanPath = filePath.replace(/^\/+/, '');
+                        url = new URL(cleanPath, window.location.origin);
                     }
                     
-                    console.log('Attempting to download:', actualPath);
+                    console.log('Full download URL:', url.toString());
                     
-                    const response = await fetch(actualPath, {
-                        cache: 'no-cache',  // Disable cache to ensure fresh download
-                        headers: { 'Cache-Control': 'no-cache' }
+                    // Add a timestamp to prevent caching
+                    url.searchParams.append('t', Date.now());
+                    
+                    const response = await fetch(url, {
+                        method: 'GET',
+                        cache: 'no-store',
+                        headers: {
+                            'Cache-Control': 'no-cache, no-store, must-revalidate',
+                            'Pragma': 'no-cache',
+                            'Expires': '0'
+                        }
                     });
                     
                     if (!response.ok) {
@@ -1115,21 +1132,32 @@
                     
                     // Get the blob data
                     const blob = await response.blob();
-                    const url = window.URL.createObjectURL(blob);
-                    const a = document.createElement('a');
-                    a.style.display = 'none';
-                    a.href = url;
-                    a.download = fileName;
-                    document.body.appendChild(a);
-                    a.click();
+                    console.log('Blob size:', blob.size, 'bytes');
+                    
+                    if (blob.size === 0) {
+                        throw new Error('Received empty file (0 bytes)');
+                    }
+                    
+                    // Create object URL
+                    const objectUrl = window.URL.createObjectURL(blob);
+                    
+                    // Create a temporary link and trigger download
+                    const link = document.createElement('a');
+                    link.href = objectUrl;
+                    link.download = fileName;
+                    link.style.display = 'none';
+                    
+                    // Add to document, trigger click, then remove
+                    document.body.appendChild(link);
+                    link.click();
                     
                     // Cleanup
                     setTimeout(() => {
-                        window.URL.revokeObjectURL(url);
-                        document.body.removeChild(a);
+                        document.body.removeChild(link);
+                        window.URL.revokeObjectURL(objectUrl);
                     }, 100);
                     
-                    console.log(`Successfully downloaded: ${fileName}`);
+                    console.log(`Successfully triggered download for: ${fileName}`);
                     return true;
                 } catch (error) {
                     console.error('Download error:', error);
