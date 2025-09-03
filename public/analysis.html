@@ -1113,11 +1113,31 @@
                 // Prevent multiple clicks
                 const downloadButton = clickEvent?.target;
                 const originalButtonText = downloadButton?.innerHTML || 'Download';
+                const BATCH_SIZE = 20; // Increased batch size for faster downloads
+                const PARALLEL_DOWNLOADS = 6; // Number of parallel downloads
                 
                 if (downloadButton) {
                     downloadButton.disabled = true;
                     downloadButton.innerHTML = 'Preparing download...';
                 }
+                
+                // Track active downloads to manage concurrency
+                let activeDownloads = 0;
+                const downloadQueue = [];
+                const processQueue = async () => {
+                    while (downloadQueue.length > 0 && activeDownloads < PARALLEL_DOWNLOADS) {
+                        const task = downloadQueue.shift();
+                        activeDownloads++;
+                        try {
+                            await task();
+                        } catch (error) {
+                            console.error('Download task failed:', error);
+                        } finally {
+                            activeDownloads--;
+                            processQueue(); // Process next in queue
+                        }
+                    }
+                };
 
                 try {
                     const files = fileData[type] || [];
@@ -1131,7 +1151,7 @@
                         await downloadFile(files[0].path, files[0].filename);
                         if (downloadButton) {
                             downloadButton.disabled = false;
-                            downloadButton.innerHTML = 'Download';
+                            downloadButton.innerHTML = originalButtonText;
                         }
                         return;
                     }
@@ -1140,59 +1160,76 @@
                     const zip = new JSZip();
                     const folder = zip.folder(type);
                     
-                    // Process files in parallel with progress tracking
-                    const processFile = async (file) => {
-                        const controller = new AbortController();
-                        const timeoutId = setTimeout(() => controller.abort(), 60000);
-                        
-                        try {
-                            const response = await fetch(file.path, { 
-                                signal: controller.signal,
-                                cache: 'force-cache'
+                    // Process files with optimized concurrency
+                    const processBatch = async (batch) => {
+                        const results = [];
+                        for (const file of batch) {
+                            downloadQueue.push(async () => {
+                                try {
+                                    const controller = new AbortController();
+                                    const timeoutId = setTimeout(() => controller.abort(), 30000);
+                                    
+                                    const response = await fetch(file.path, { 
+                                        signal: controller.signal,
+                                        cache: 'force-cache',
+                                        priority: 'high'
+                                    });
+                                    clearTimeout(timeoutId);
+                                    
+                                    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                                    
+                                    const blob = await response.blob();
+                                    folder.file(file.filename, blob, { binary: true });
+                                    results.push(true);
+                                    
+                                    // Update progress
+                                    processedCount++;
+                                    if (downloadButton) {
+                                        const percent = Math.round((processedCount / files.length) * 100);
+                                        downloadButton.innerHTML = `Downloading (${processedCount}/${files.length} - ${percent}%)`;
+                                    }
+                                    
+                                } catch (error) {
+                                    console.error(`Failed to process ${file.filename}:`, error);
+                                    results.push(false);
+                                }
                             });
-                            clearTimeout(timeoutId);
-                            
-                            if (!response.ok) throw new Error(`HTTP ${response.status}`);
-                            
-                            const blob = await response.blob();
-                            folder.file(file.filename, blob);
-                            return true;
-                            
-                        } catch (error) {
-                            console.error(`Failed to process ${file.filename}:`, error);
-                            return false;
-                        } finally {
-                            clearTimeout(timeoutId);
                         }
+                        
+                        // Process the queue
+                        await processQueue();
+                        return results;
                     };
                     
-                    // Process all files with progress tracking
-                    const BATCH_SIZE = 10;
+                    // Process files in optimized parallel batches
                     let processedCount = 0;
                     const totalFiles = files.length;
                     
-                    const updateProgress = (current, total) => {
-                        const percent = Math.round((current / total) * 100);
-                        console.log(`Processed ${current}/${total} files (${percent}%)`);
-                        if (downloadButton) {
-                            downloadButton.innerHTML = `Downloading ${type} (${current}/${total} - ${percent}%)`;
-                        }
-                    };
-                    
-                    // Process files in batches
+                    // Process all files in parallel with controlled concurrency
+                    const batchPromises = [];
                     for (let i = 0; i < totalFiles; i += BATCH_SIZE) {
                         const batch = files.slice(i, i + BATCH_SIZE);
-                        const batchResults = await Promise.all(batch.map(processFile));
-                        const successfulInBatch = batchResults.filter(Boolean).length;
-                        processedCount += successfulInBatch;
-                        updateProgress(processedCount, totalFiles);
+                        batchPromises.push(
+                            processBatch(batch).then(results => {
+                                const successCount = results.filter(Boolean).length;
+                                processedCount += successCount;
+                                const percent = Math.round((processedCount / totalFiles) * 100);
+                                if (downloadButton) {
+                                    downloadButton.innerHTML = `Downloading ${type} (${processedCount}/${totalFiles} - ${percent}%)`;
+                                }
+                                return successCount;
+                            })
+                        );
                         
-                        // Small delay between batches to prevent UI freeze
-                        if (i + BATCH_SIZE < totalFiles) {
-                            await new Promise(resolve => setTimeout(resolve, 100));
+                        // Don't create too many promises at once
+                        if (batchPromises.length >= 3) {
+                            await Promise.race(batchPromises);
                         }
                     }
                     
+                    // Wait for all batches to complete
+                    await Promise.all(batchPromises);
+
                     if (processedCount === 0) {
                         throw new Error('No files could be added to the zip');
                     }
