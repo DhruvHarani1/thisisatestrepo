@@ -1220,6 +1220,7 @@
                 let lastUpdateTime = startTime;
                 let lastDownloaded = 0;
                 let speed = 0;
+                let progressInterval; // Declare progressInterval at the function scope
 
                 try {
                     const files = fileData[type] || [];
@@ -1275,7 +1276,7 @@
                             alert(`Download failed: ${error.message}`);
                             throw error; // Re-throw to be caught by outer catch
                         } finally {
-                            clearInterval(progressInterval);
+                            if (progressInterval) clearInterval(progressInterval);
                             if (downloadButton) {
                                 downloadButton.disabled = false;
                                 downloadButton.innerHTML = originalButtonText;
@@ -1291,59 +1292,63 @@
                     const processFile = async (file, index) => {
                         try {
                             const controller = new AbortController();
-                            const timeoutId = setTimeout(() => controller.abort(), 30000); // 30s timeout
+                            const timeoutId = setTimeout(() => controller.abort(), 60000); // 60s timeout
                             
-                            const startTime = performance.now();
-                            const response = await fetch(file.path, { 
-                                signal: controller.signal,
-                                cache: 'force-cache',
-                                headers: { 'Cache-Control': 'max-age=31536000' } // 1 year cache
-                            });
-                            clearTimeout(timeoutId);
+                            console.log(`Processing file: ${file.path}`);
                             
-                            if (!response.ok) throw new Error(`HTTP ${response.status}`);
-                            
-                            const contentLength = response.headers.get('content-length');
-                            const total = contentLength ? parseInt(contentLength, 10) : 0;
-                            let loaded = 0;
-                            
-                            // Use streaming for better memory efficiency
-                            const reader = response.body.getReader();
-                            const chunks = [];
-                            
-                            while (true) {
-                                const { done, value } = await reader.read();
-                                if (done) break;
-                                
-                                loaded += value.length;
-                                chunks.push(value);
-                                
-                                // Update progress for this file
-                                if (total > 0) {
-                                    const percent = Math.round((loaded / total) * 100);
-                                    const elapsed = (performance.now() - startTime) / 1000;
-                                    const speed = loaded / elapsed;
-                                    
-                                    // Update every 200ms or when 5% progress is made
-                                    if (index % 5 === 0 || percent % 5 === 0) {
-                                        const remainingTime = speed > 0 ? Math.round((total - loaded) / speed) : 0;
-                                        const speedKBps = (speed / 1024).toFixed(1);
-                                        progressModal.update(
-                                            downloadedCount, 
-                                            files.length,
-                                            `File ${index + 1}/${files.length} (${percent}%) - ${speedKBps}KB/s`,
-                                            remainingTime > 0 ? `${remainingTime}s remaining` : ''
-                                        );
-                                    }
-                                }
+                            // Create a new URL for the file
+                            let fileUrl;
+                            try {
+                                fileUrl = new URL(file.path, window.location.origin);
+                            } catch (e) {
+                                // If it's not a valid URL, treat it as a relative path
+                                const cleanPath = file.path.replace(/^\/+/, '');
+                                fileUrl = new URL(cleanPath, window.location.origin);
                             }
                             
-                            const blob = new Blob(chunks);
+                            // Add timestamp to prevent caching
+                            fileUrl.searchParams.append('t', Date.now());
+                            
+                            console.log(`Fetching file from: ${fileUrl.toString()}`);
+                            
+                            const response = await fetch(fileUrl.toString(), {
+                                signal: controller.signal,
+                                cache: 'no-cache',
+                                headers: {
+                                    'Cache-Control': 'no-cache, no-store, must-revalidate',
+                                    'Pragma': 'no-cache',
+                                    'Expires': '0'
+                                }
+                            });
+                            
+                            clearTimeout(timeoutId);
+                            
+                            if (!response.ok) {
+                                throw new Error(`HTTP ${response.status} - ${response.statusText}`);
+                            }
+                            
+                            const blob = await response.blob();
+                            
+                            if (blob.size === 0) {
+                                throw new Error('Received empty file');
+                            }
+                            
+                            console.log(`Adding to ZIP: ${file.filename} (${blob.size} bytes)`);
+                            
+                            // Add file to ZIP
                             folder.file(file.filename, blob);
                             
                             // Update global progress
                             downloadedCount++;
                             totalSize += blob.size;
+                            
+                            // Update progress
+                            progressModal.update(
+                                downloadedCount,
+                                files.length,
+                                `Processed ${downloadedCount}/${files.length} files`,
+                                ''
+                            );
                             
                             return true;
                             
@@ -1354,48 +1359,82 @@
                     };
                     
                     // Process files in parallel with concurrency control
-                    const CONCURRENT_DOWNLOADS = 5;
+                    const CONCURRENT_DOWNLOADS = 3; // Reduced concurrency for better performance
                     const downloadQueue = [...files];
                     const activeDownloads = [];
                     let completedCount = 0;
                     
+                    // Clear any existing interval
+                    if (progressInterval) clearInterval(progressInterval);
+                    
                     // Process queue with concurrency control
                     const processQueue = async () => {
-                        while (downloadQueue.length > 0 && activeDownloads.length < CONCURRENT_DOWNLOADS) {
-                            const file = downloadQueue.shift();
-                            if (!file) continue;
+                        try {
+                            while (downloadQueue.length > 0 && activeDownloads.length < CONCURRENT_DOWNLOADS) {
+                                const file = downloadQueue.shift();
+                                if (!file) continue;
+                                
+                                const downloadPromise = processFile(file, completedCount + activeDownloads.length + 1)
+                                    .then(() => {
+                                        completedCount++;
+                                        return true;
+                                    })
+                                    .catch(error => {
+                                        console.error(`Error processing ${file.filename}:`, error);
+                                        return false;
+                                    })
+                                    .finally(() => {
+                                        const index = activeDownloads.indexOf(downloadPromise);
+                                        if (index > -1) {
+                                            activeDownloads.splice(index, 1);
+                                        }
+                                        // Process next in queue
+                                        if (downloadQueue.length > 0 || activeDownloads.length > 0) {
+                                            processQueue();
+                                        }
+                                    });
+                                
+                                activeDownloads.push(downloadPromise);
+                            }
                             
-                            const downloadPromise = processFile(file, completedCount + activeDownloads.length + 1)
-                                .finally(() => {
-                                    const index = activeDownloads.indexOf(downloadPromise);
-                                    if (index > -1) {
-                                        activeDownloads.splice(index, 1);
-                                    }
-                                    completedCount++;
-                                    processQueue(); // Process next in queue
-                                });
+                            // Update progress
+                            progressModal.update(
+                                completedCount,
+                                files.length,
+                                `Downloading... (${completedCount}/${files.length})`,
+                                ''
+                            );
                             
-                            activeDownloads.push(downloadPromise);
-                        }
-                        
-                        // Update progress
-                        progressModal.update(
-                            completedCount,
-                            files.length,
-                            `Downloading... (${completedCount}/${files.length})`,
-                            ''
-                        );
-                        
-                        // If queue is empty but downloads are still active, wait for them to finish
-                        if (downloadQueue.length === 0 && activeDownloads.length > 0) {
-                            await Promise.all(activeDownloads);
+                            // If queue is empty but downloads are still active, wait for them to finish
+                            if (downloadQueue.length === 0 && activeDownloads.length > 0) {
+                                await Promise.all(activeDownloads);
+                            }
+                        } catch (error) {
+                            console.error('Error in processQueue:', error);
                         }
                     };
                     
                     // Start processing
                     await processQueue();
 
-                    // Prepare for download
+                    // Generate the zip file with progress updates
+                    progressModal.update(
+                        files.length,
+                        files.length,
+                        'Creating archive...',
+                        ''
+                    );
+
+                    console.log('Generating ZIP file...');
+                    
+                    // First, check if we have any files in the zip
+                    const fileCount = Object.keys(folder.files).length;
+                    console.log(`Files in ZIP: ${fileCount}`);
+                    
+                    if (fileCount === 0) {
+                        throw new Error('No files were added to the ZIP archive');
+                    }
+
                     const zipBlob = await zip.generateAsync(
                         {
                             type: 'blob',
@@ -1463,13 +1502,12 @@
                 } catch (error) {
                     console.error(`Error downloading ${type} files:`, error);
                     alert(`Error: ${error.message}`);
+                } finally {
+                    if (progressInterval) clearInterval(progressInterval);
                     if (downloadButton) {
                         downloadButton.disabled = false;
                         downloadButton.innerHTML = 'Try Again';
                     }
-                } finally {
-                    clearInterval(progressInterval);
-                    alert(`Error downloading ${type} files: ${error.message}`);
                 }
             };
 
