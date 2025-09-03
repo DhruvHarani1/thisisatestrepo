@@ -1066,17 +1066,33 @@
 
             const downloadFile = async (filePath, fileName) => {
                 try {
-                    const response = await fetch(filePath, {
-                        cache: 'force-cache',
-                        headers: { 'Cache-Control': 'max-age=31536000' } // 1 year cache
+                    // Ensure filePath is a valid URL or relative path
+                    let actualPath = filePath;
+                    
+                    // If it's a relative path without leading slash, add one
+                    if (!filePath.startsWith('http') && !filePath.startsWith('/') && !filePath.startsWith('./')) {
+                        actualPath = `/${filePath}`;
+                    }
+                    
+                    // For local development, use the full path
+                    if (!window.location.hostname.includes('netlify.app')) {
+                        // Remove any leading slashes to prevent double slashes
+                        actualPath = actualPath.replace(/^\/+/, '');
+                    }
+                    
+                    console.log('Attempting to download:', actualPath);
+                    
+                    const response = await fetch(actualPath, {
+                        cache: 'no-cache',  // Disable cache to ensure fresh download
+                        headers: { 'Cache-Control': 'no-cache' }
                     });
                     
                     if (!response.ok) {
-                        throw new Error(`Failed to download ${filePath}: ${response.status} ${response.statusText}`);
+                        throw new Error(`Failed to download ${actualPath}: ${response.status} ${response.statusText}`);
                     }
                     
                     // Get the file extension to determine content type
-                    const extension = filePath.split('.').pop().toLowerCase();
+                    const extension = fileName.split('.').pop().toLowerCase();
                     let contentType = 'application/octet-stream'; // default binary type
                     
                     // Set content type based on file extension
@@ -1099,20 +1115,21 @@
                     
                     // Get the blob data
                     const blob = await response.blob();
-                    const url = window.URL.createObjectURL(new Blob([blob], { type: contentType }));
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.style.display = 'none';
+                    a.href = url;
+                    a.download = fileName;
+                    document.body.appendChild(a);
+                    a.click();
                     
-                    // Create a temporary link and trigger download
-                    const link = document.createElement('a');
-                    link.href = url;
-                    link.setAttribute('download', fileName || filePath.split('/').pop());
-                    document.body.appendChild(link);
-                    link.click();
+                    // Cleanup
+                    setTimeout(() => {
+                        window.URL.revokeObjectURL(url);
+                        document.body.removeChild(a);
+                    }, 100);
                     
-                    // Clean up
-                    link.parentNode.removeChild(link);
-                    window.URL.revokeObjectURL(url);
-                    
-                    console.log(`Successfully downloaded: ${filePath}`);
+                    console.log(`Successfully downloaded: ${fileName}`);
                     return true;
                 } catch (error) {
                     console.error('Download error:', error);
@@ -1158,6 +1175,7 @@
             };
 
             const downloadFiles = async (type, clickEvent) => {
+                console.log('Starting download for type:', type);
                 // Prevent multiple clicks
                 const downloadButton = clickEvent?.target;
                 const originalButtonText = downloadButton?.innerHTML || 'Download';
@@ -1219,12 +1237,15 @@
                     // For single files, download directly (no need for zip)
                     if (files.length === 1) {
                         try {
+                            console.log('Downloading single file:', files[0]);
                             await downloadFile(files[0].path, files[0].filename);
                             progressModal.update(1, 1, 'Download complete', '');
                             setTimeout(() => progressModal.close(), 1000);
+                            return;
                         } catch (error) {
                             console.error('Download failed:', error);
                             alert(`Download failed: ${error.message}`);
+                            throw error; // Re-throw to be caught by outer catch
                         } finally {
                             clearInterval(progressInterval);
                             if (downloadButton) {
@@ -1232,7 +1253,6 @@
                                 downloadButton.innerHTML = originalButtonText;
                             }
                         }
-                        return;
                     }
 
                     const JSZip = window.JSZip;
