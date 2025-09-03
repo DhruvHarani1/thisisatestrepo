@@ -1055,9 +1055,22 @@
             }, [chatData]);
 
             // Helper function to download a single file with proper content type
+            // Helper function to format file size
+            const formatFileSize = (bytes) => {
+                if (bytes === 0) return '0 Bytes';
+                const k = 1024;
+                const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+                const i = Math.floor(Math.log(bytes) / Math.log(k));
+                return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+            };
+
             const downloadFile = async (filePath, fileName) => {
                 try {
-                    const response = await fetch(filePath);
+                    const response = await fetch(filePath, {
+                        cache: 'force-cache',
+                        headers: { 'Cache-Control': 'max-age=31536000' } // 1 year cache
+                    });
+                    
                     if (!response.ok) {
                         throw new Error(`Failed to download ${filePath}: ${response.status} ${response.statusText}`);
                     }
@@ -1109,61 +1122,42 @@
             };
 
             // Optimized downloadFiles function with parallel processing and proper cleanup
-            // Progress Modal Component
-            const ProgressModal = ({ progress, currentFile, totalFiles, isOpen, onClose }) => {
-                if (!isOpen) return null;
-                
-                return (
-                    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-                        <div className="bg-white rounded-xl p-6 w-full max-w-md">
-                            <h3 className="text-xl font-semibold mb-4">Downloading Files</h3>
-                            
-                            <div className="w-full bg-gray-200 rounded-full h-2.5 mb-4">
-                                <div 
-                                    className="bg-blue-600 h-2.5 rounded-full transition-all duration-300"
-                                    style={{ width: `${progress}%` }}
-                                ></div>
-                            </div>
-                            
-                            <div className="flex justify-between text-sm text-gray-600 mb-2">
-                                <span>Progress: {Math.round(progress)}%</span>
-                                <span>{currentFile} of {totalFiles} files</span>
-                            </div>
-                            
-                            <div className="text-sm text-gray-500 truncate">
-                                {currentFile > 0 ? `Downloading: ${currentFile}/${totalFiles}` : 'Preparing...'}
-                            </div>
-                            
-                            <button 
-                                onClick={onClose}
-                                className="mt-4 px-4 py-2 bg-red-500 text-white rounded-md hover:bg-red-600 transition-colors"
-                            >
-                                Cancel Download
-                            </button>
+            // Create a progress modal
+            const createProgressModal = (type, totalFiles) => {
+                const modal = document.createElement('div');
+                modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50';
+                modal.innerHTML = `
+                    <div class="bg-white rounded-xl p-6 w-full max-w-md">
+                        <h3 class="text-xl font-bold text-gray-800 mb-4">Downloading ${type} (0/${totalFiles})</h3>
+                        <div class="w-full bg-gray-200 rounded-full h-4 mb-4">
+                            <div id="progressBar" class="bg-blue-600 h-4 rounded-full" style="width: 0%"></div>
                         </div>
+                        <div id="progressText" class="text-center text-gray-600 mb-2">Preparing download...</div>
+                        <div id="speedText" class="text-center text-sm text-gray-500">-</div>
+                        <div id="timeRemaining" class="text-center text-sm text-gray-500">-</div>
                     </div>
-                );
+                `;
+                document.body.appendChild(modal);
+                return {
+                    update: (current, total, speed, remaining) => {
+                        const percent = Math.round((current / total) * 100);
+                        const progressBar = modal.querySelector('#progressBar');
+                        const progressText = modal.querySelector('#progressText');
+                        const speedText = modal.querySelector('#speedText');
+                        const timeRemaining = modal.querySelector('#timeRemaining');
+                        
+                        if (progressBar) progressBar.style.width = `${percent}%`;
+                        if (progressText) progressText.textContent = `Downloading ${current} of ${total} files (${percent}%)`;
+                        if (speedText) speedText.textContent = speed ? `Speed: ${speed}/s` : '';
+                        if (timeRemaining) timeRemaining.textContent = remaining ? `Time remaining: ${remaining}` : '';
+                    },
+                    close: () => {
+                        modal.remove();
+                    }
+                };
             };
 
-            const [downloadState, setDownloadState] = useState({
-                progress: 0,
-                currentFile: 0,
-                totalFiles: 0,
-                isDownloading: false,
-                currentFileName: ''
-            });
-            const abortController = useRef(new AbortController());
-            
             const downloadFiles = async (type, clickEvent) => {
-                // Reset state
-                setDownloadState({
-                    progress: 0,
-                    currentFile: 0,
-                    totalFiles: 0,
-                    isDownloading: true,
-                    currentFileName: ''
-                });
-                
                 // Prevent multiple clicks
                 const downloadButton = clickEvent?.target;
                 const originalButtonText = downloadButton?.innerHTML || 'Download';
@@ -1172,144 +1166,72 @@
                     downloadButton.disabled = true;
                     downloadButton.innerHTML = 'Preparing download...';
                 }
-                
+
+                // Track download progress
+                let downloadedCount = 0;
+                let totalSize = 0;
+                let startTime = Date.now();
+                let lastUpdateTime = startTime;
+                let lastDownloaded = 0;
+                let speed = 0;
+
                 try {
                     const files = fileData[type] || [];
                     if (files.length === 0) {
                         alert(`No ${type} files found!`);
-                        return;
-                    }
-                    
-                    // Update total files count
-                    setDownloadState(prev => ({
-                        ...prev,
-                        totalFiles: files.length
-                    }));
-                    
-                    // For single file, download directly
-                    if (files.length === 1) {
-                        const file = files[0];
-                        setDownloadState(prev => ({
-                            ...prev,
-                            currentFileName: file.filename,
-                            currentFile: 1,
-                            progress: 100
-                        }));
-                        
-                        await downloadFile(file.path, file.filename);
-                        
                         if (downloadButton) {
                             downloadButton.disabled = false;
-                            downloadButton.innerHTML = 'Download Complete!';
-                            setTimeout(() => {
-                                downloadButton.innerHTML = originalButtonText;
-                            }, 2000);
+                            downloadButton.innerHTML = originalButtonText;
                         }
                         return;
                     }
+
+                    // Create progress modal
+                    const progressModal = createProgressModal(type, files.length);
                     
-                    // For multiple files, create a zip
-                    const JSZip = window.JSZip;
-                    const zip = new JSZip();
-                    const folder = zip.folder(type);
-                    
-                    // Process files in parallel with concurrency control
-                    const CONCURRENT_DOWNLOADS = 5;
-                    const processBatch = async (batch) => {
-                        const results = [];
-                        for (const file of batch) {
-                            try {
-                                setDownloadState(prev => ({
-                                    ...prev,
-                                    currentFileName: file.filename,
-                                    currentFile: prev.currentFile + 1,
-                                    progress: Math.round(((prev.currentFile + 1) / files.length) * 100)
-                                }));
-                                
-                                const response = await fetch(file.path, {
-                                    signal: abortController.current.signal,
-                                    cache: 'force-cache',
-                                    headers: { 'Cache-Control': 'max-age=31536000' }
-                                });
-                                
-                                if (!response.ok) {
-                                    console.error(`Failed to download ${file.filename}: ${response.status}`);
-                                    continue;
-                                }
-                                
-                                const blob = await response.blob();
-                                folder.file(file.filename, blob, { binary: true });
-                                results.push(true);
-                                
-                            } catch (error) {
-                                console.error(`Error processing ${file.filename}:`, error);
-                                results.push(false);
-                            }
-                        }
-                        return results;
-                    };
-                    
-                    // Process files in batches
-                    for (let i = 0; i < files.length; i += CONCURRENT_DOWNLOADS) {
-                        const batch = files.slice(i, i + CONCURRENT_DOWNLOADS);
-                        await processBatch(batch);
+                    // Update progress every 200ms for smooth animation
+                    const progressInterval = setInterval(() => {
+                        const now = Date.now();
+                        const timeDiff = (now - lastUpdateTime) / 1000; // in seconds
                         
-                        // Check if download was cancelled
-                        if (abortController.current.signal.aborted) {
-                            throw new Error('Download cancelled by user');
-                        }
-                    }
-                    
-                    // Generate the zip file with progress updates
-                    if (downloadButton) {
-                        downloadButton.innerHTML = 'Creating archive...';
-                    }
-                    
-                    const zipBlob = await zip.generateAsync(
-                        {
-                            type: 'blob',
-                            compression: 'DEFLATE',
-                            compressionOptions: { level: 5 },
-                        },
-                        (metadata) => {
-                            const progress = Math.round((metadata.currentFile / metadata.total) * 100);
-                            setDownloadState(prev => ({
-                                ...prev,
-                                progress: progress
-                            }));
+                        if (timeDiff > 0) {
+                            const newSpeed = Math.round((downloadedCount - lastDownloaded) / timeDiff);
+                            speed = Math.round(speed * 0.7 + newSpeed * 0.3); // Smooth speed changes
                             
+                            const remainingFiles = files.length - downloadedCount;
+                            const remainingTime = speed > 0 ? Math.round(remainingFiles / speed) : 0;
+                            const remainingTimeStr = remainingTime > 60 
+                                ? `${Math.floor(remainingTime / 60)}m ${remainingTime % 60}s` 
+                                : `${remainingTime}s`;
+                            
+                            progressModal.update(
+                                downloadedCount, 
+                                files.length,
+                                `${speed.toLocaleString()} files`,
+                                remainingTime > 0 ? remainingTimeStr : ''
+                            );
+                            
+                            lastUpdateTime = now;
+                            lastDownloaded = downloadedCount;
+                        }
+                    }, 200);
+
+                    // For single files, download directly (no need for zip)
+                    if (files.length === 1) {
+                        try {
+                            await downloadFile(files[0].path, files[0].filename);
+                            progressModal.update(1, 1, 'Download complete', '');
+                            setTimeout(() => progressModal.close(), 1000);
+                        } catch (error) {
+                            console.error('Download failed:', error);
+                            alert(`Download failed: ${error.message}`);
+                        } finally {
+                            clearInterval(progressInterval);
                             if (downloadButton) {
-                                downloadButton.innerHTML = `Compressing (${progress}%)...`;
+                                downloadButton.disabled = false;
+                                downloadButton.innerHTML = originalButtonText;
                             }
                         }
-                    );
-                    
-                    // Create and trigger download
-                    const downloadUrl = window.URL.createObjectURL(zipBlob);
-                    const downloadLink = document.createElement('a');
-                    downloadLink.href = downloadUrl;
-                    downloadLink.download = `${type}_${new Date().toISOString().split('T')[0]}.zip`;
-                    document.body.appendChild(downloadLink);
-                    downloadLink.click();
-                    
-                    // Cleanup
-                    setTimeout(() => {
-                        window.URL.revokeObjectURL(downloadUrl);
-                        document.body.removeChild(downloadLink);
-                    }, 100);
-                    
-                    console.log(`Successfully processed ${files.length} ${type} files`);
-                    
-                } catch (error) {
-                    console.error(`Error downloading ${type} files:`, error);
-                    if (error.name !== 'AbortError') {
-                        alert(`Error: ${error.message}`);
-                    }
-                } finally {
-                    setDownloadState(prev => ({
-                        ...prev,
-                        isDownloading: false
-                    }));
                         return;
                     }
 
@@ -1318,78 +1240,129 @@
                     const folder = zip.folder(type);
                     
                     // Process files in parallel with progress tracking
-                    const processFile = async (file) => {
-                        const controller = new AbortController();
-                        const timeoutId = setTimeout(() => controller.abort(), 60000);
-                        
+                    const processFile = async (file, index) => {
                         try {
+                            const controller = new AbortController();
+                            const timeoutId = setTimeout(() => controller.abort(), 30000); // 30s timeout
+                            
+                            const startTime = performance.now();
                             const response = await fetch(file.path, { 
                                 signal: controller.signal,
-                                cache: 'force-cache'
+                                cache: 'force-cache',
+                                headers: { 'Cache-Control': 'max-age=31536000' } // 1 year cache
                             });
                             clearTimeout(timeoutId);
                             
                             if (!response.ok) throw new Error(`HTTP ${response.status}`);
                             
-                            const blob = await response.blob();
+                            const contentLength = response.headers.get('content-length');
+                            const total = contentLength ? parseInt(contentLength, 10) : 0;
+                            let loaded = 0;
+                            
+                            // Use streaming for better memory efficiency
+                            const reader = response.body.getReader();
+                            const chunks = [];
+                            
+                            while (true) {
+                                const { done, value } = await reader.read();
+                                if (done) break;
+                                
+                                loaded += value.length;
+                                chunks.push(value);
+                                
+                                // Update progress for this file
+                                if (total > 0) {
+                                    const percent = Math.round((loaded / total) * 100);
+                                    const elapsed = (performance.now() - startTime) / 1000;
+                                    const speed = loaded / elapsed;
+                                    
+                                    // Update every 200ms or when 5% progress is made
+                                    if (index % 5 === 0 || percent % 5 === 0) {
+                                        const remainingTime = speed > 0 ? Math.round((total - loaded) / speed) : 0;
+                                        const speedKBps = (speed / 1024).toFixed(1);
+                                        progressModal.update(
+                                            downloadedCount, 
+                                            files.length,
+                                            `File ${index + 1}/${files.length} (${percent}%) - ${speedKBps}KB/s`,
+                                            remainingTime > 0 ? `${remainingTime}s remaining` : ''
+                                        );
+                                    }
+                                }
+                            }
+                            
+                            const blob = new Blob(chunks);
                             folder.file(file.filename, blob);
+                            
+                            // Update global progress
+                            downloadedCount++;
+                            totalSize += blob.size;
+                            
                             return true;
                             
                         } catch (error) {
                             console.error(`Failed to process ${file.filename}:`, error);
                             return false;
-                        } finally {
-                            clearTimeout(timeoutId);
                         }
                     };
                     
-                    // Process all files with progress tracking
-                    const BATCH_SIZE = 10;
-                    let processedCount = 0;
-                    const totalFiles = files.length;
+                    // Process files in parallel with concurrency control
+                    const CONCURRENT_DOWNLOADS = 5;
+                    const downloadQueue = [...files];
+                    const activeDownloads = [];
+                    let completedCount = 0;
                     
-                    const updateProgress = (current, total) => {
-                        const percent = Math.round((current / total) * 100);
-                        console.log(`Processed ${current}/${total} files (${percent}%)`);
-                        if (downloadButton) {
-                            downloadButton.innerHTML = `Downloading ${type} (${current}/${total} - ${percent}%)`;
+                    // Process queue with concurrency control
+                    const processQueue = async () => {
+                        while (downloadQueue.length > 0 && activeDownloads.length < CONCURRENT_DOWNLOADS) {
+                            const file = downloadQueue.shift();
+                            if (!file) continue;
+                            
+                            const downloadPromise = processFile(file, completedCount + activeDownloads.length + 1)
+                                .finally(() => {
+                                    const index = activeDownloads.indexOf(downloadPromise);
+                                    if (index > -1) {
+                                        activeDownloads.splice(index, 1);
+                                    }
+                                    completedCount++;
+                                    processQueue(); // Process next in queue
+                                });
+                            
+                            activeDownloads.push(downloadPromise);
                         }
-                    };
-                    
-                    // Process files in batches
-                    for (let i = 0; i < totalFiles; i += BATCH_SIZE) {
-                        const batch = files.slice(i, i + BATCH_SIZE);
-                        const batchResults = await Promise.all(batch.map(processFile));
-                        const successfulInBatch = batchResults.filter(Boolean).length;
-                        processedCount += successfulInBatch;
-                        updateProgress(processedCount, totalFiles);
                         
-                        // Small delay between batches to prevent UI freeze
-                        if (i + BATCH_SIZE < totalFiles) {
-                            await new Promise(resolve => setTimeout(resolve, 100));
+                        // Update progress
+                        progressModal.update(
+                            completedCount,
+                            files.length,
+                            `Downloading... (${completedCount}/${files.length})`,
+                            ''
+                        );
+                        
+                        // If queue is empty but downloads are still active, wait for them to finish
+                        if (downloadQueue.length === 0 && activeDownloads.length > 0) {
+                            await Promise.all(activeDownloads);
                         }
-                    }
+                    };
                     
-                    if (processedCount === 0) {
-                        throw new Error('No files could be added to the zip');
-                    }
+                    // Start processing
+                    await processQueue();
 
-                    // Generate the zip file
-                    if (downloadButton) {
-                        downloadButton.innerHTML = 'Creating archive...';
-                    }
-
+                    // Prepare for download
                     const zipBlob = await zip.generateAsync(
                         {
                             type: 'blob',
                             compression: 'DEFLATE',
-                            compressionOptions: { level: 6 }
+                            compressionOptions: { level: 6 },
+                            streamFiles: true
                         },
                         (metadata) => {
-                            if (downloadButton) {
-                                const percent = Math.round((metadata.currentFile / metadata.total) * 100);
-                                downloadButton.innerHTML = `Compressing (${percent}%)...`;
-                            }
+                            const percent = Math.round((metadata.currentFile / metadata.total) * 100);
+                            progressModal.update(
+                                files.length,
+                                files.length,
+                                `Compressing archive... (${percent}%)`,
+                                ''
+                            );
                         }
                     );
 
@@ -1398,34 +1371,56 @@
                     const downloadLink = document.createElement('a');
                     downloadLink.href = downloadUrl;
                     downloadLink.download = `${type}_${new Date().toISOString().split('T')[0]}.zip`;
+                    
+                    // Show completion in UI
+                    progressModal.update(
+                        files.length,
+                        files.length,
+                        'Download ready!',
+                        'Preparing download...'
+                    );
+                    
+                    // Small delay to ensure UI updates are visible
+                    await new Promise(resolve => setTimeout(resolve, 500));
+                    
+                    // Trigger download
                     document.body.appendChild(downloadLink);
                     downloadLink.click();
-
-                    // Cleanup
+                    
+                    // Update UI and clean up
+                    progressModal.update(
+                        files.length,
+                        files.length,
+                        'Download complete!',
+                        `Downloaded ${files.length} files (${formatFileSize(totalSize)})`
+                    );
+                    
+                    // Clean up after a short delay
                     setTimeout(() => {
                         window.URL.revokeObjectURL(downloadUrl);
                         document.body.removeChild(downloadLink);
+                        progressModal.close();
+                        
                         if (downloadButton) {
                             downloadButton.disabled = false;
                             downloadButton.innerHTML = 'Download Complete!';
                             setTimeout(() => {
-                                downloadButton.innerHTML = 'Download';
+                                downloadButton.innerHTML = originalButtonText;
                             }, 2000);
                         }
-                    }, 100);
+                    }, 1000);
+                    
+                    console.log(`Successfully processed ${files.length} ${type} files (${formatFileSize(totalSize)})`);
 
-                    console.log(`Successfully processed ${processedCount} ${type} files`);
-
-                    // Clean up UI
-                    if (downloadButton) {
-                        downloadButton.disabled = false;
-                        downloadButton.innerHTML = 'Download Complete!';
-                        setTimeout(() => {
-                            downloadButton.innerHTML = 'Download';
-                        }, 2000);
-                    }
                 } catch (error) {
                     console.error(`Error downloading ${type} files:`, error);
+                    alert(`Error: ${error.message}`);
+                    if (downloadButton) {
+                        downloadButton.disabled = false;
+                        downloadButton.innerHTML = 'Try Again';
+                    }
+                } finally {
+                    clearInterval(progressInterval);
                     alert(`Error downloading ${type} files: ${error.message}`);
                 }
             };
